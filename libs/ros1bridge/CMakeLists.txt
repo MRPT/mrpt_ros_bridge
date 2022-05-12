@@ -1,10 +1,12 @@
 
 # Don't declare the library if dependencies are missing:
+if(NOT CMAKE_MRPT_ROS_VERSION EQUAL 1)
+	return()
+endif()
 if(
 	NOT cv_bridge_FOUND OR
 	NOT geometry_msgs_FOUND OR
 	NOT nav_msgs_FOUND OR
-	(NOT rosbag_storage_FOUND AND NOT rosbag2_FOUND) OR
 	NOT sensor_msgs_FOUND OR
 	NOT std_msgs_FOUND OR
 	NOT stereo_msgs_FOUND OR
@@ -47,12 +49,13 @@ if(BUILD_mrpt-ros1bridge)
 	target_include_directories(ros1bridge
 		SYSTEM
 		PUBLIC
-		${roscpp_INCLUDE_DIRS}
-		${rosbag_storage_INCLUDE_DIRS}
+		#${roscpp_INCLUDE_DIRS}
+		#${rosbag_storage_INCLUDE_DIRS}
 		${cv_bridge_INCLUDE_DIRS}
 		${pcl_conversions_INCLUDE_DIRS}
 		${tf2_INCLUDE_DIRS}
 	)
 	target_compile_definitions(ros1bridge PRIVATE ${ROS_DEFINITIONS})
+	target_compile_definitions(ros1bridge PRIVATE IS_MRPT_ROS1BRIDGE)
 
 endif()
