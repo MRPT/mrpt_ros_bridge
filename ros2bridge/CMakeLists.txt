@@ -1,3 +1,4 @@
+# mrpt_libros_bridge
 
 # Don't declare the library if dependencies are missing:
 if(NOT MRPT_ROS_VERSION EQUAL 2)
