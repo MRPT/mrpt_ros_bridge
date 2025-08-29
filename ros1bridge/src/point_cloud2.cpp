@@ -12,7 +12,6 @@
 #include <mrpt/ros1bridge/point_cloud2.h>
 #include <mrpt/ros1bridge/time.h>
 #include <mrpt/version.h>
-#include <ros/console.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/PointField.h>
 

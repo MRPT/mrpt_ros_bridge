@@ -8,7 +8,6 @@
    +------------------------------------------------------------------------+ */
 
 #include <mrpt/ros1bridge/point_cloud.h>
-#include <ros/console.h>
 
 using namespace mrpt::maps;
 
