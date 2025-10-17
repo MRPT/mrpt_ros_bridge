@@ -37,17 +37,17 @@ target_link_libraries(
   mrpt::tclap
 )
 
-ament_target_dependencies(
+target_link_libraries(
   ${PROJECT_NAME}
-  rclcpp
-  tf2
-  nav_msgs
-  sensor_msgs
-  rosbag2_cpp
-  tf2_msgs
-  cv_bridge
-  tf2_geometry_msgs
-  mrpt_msgs
+  rclcpp::rclcpp
+  tf2::tf2
+  nav_msgs::nav_msgs__rosidl_typesupport_cpp
+  sensor_msgs::sensor_msgs_library
+  rosbag2_cpp::rosbag2_cpp
+  tf2_msgs::tf2_msgs__rosidl_typesupport_cpp
+  cv_bridge::cv_bridge
+  tf2_geometry_msgs::tf2_geometry_msgs
+  mrpt_msgs::mrpt_msgs_library
 )
 
 

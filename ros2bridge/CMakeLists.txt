@@ -54,7 +54,7 @@ define_mrpt_lib(
 
 if(BUILD_mrpt-ros2bridge)
 	# Add the required libraries:
-	ament_target_dependencies(ros2bridge PUBLIC
+	target_link_libraries(ros2bridge PUBLIC
 		rclcpp
 		tf2
 		cv_bridge
