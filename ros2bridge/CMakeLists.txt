@@ -1,71 +1,111 @@
-# mrpt_libros_bridge
+cmake_minimum_required(VERSION 3.10)
+project(mrpt_libros_bridge)
 
-# Don't declare the library if dependencies are missing:
-if(NOT MRPT_ROS_VERSION EQUAL 2)
-	return()
-endif()
-if(
-	NOT cv_bridge_FOUND OR
-	NOT geometry_msgs_FOUND OR
-	NOT nav_msgs_FOUND OR
-	NOT sensor_msgs_FOUND OR
-	NOT std_msgs_FOUND OR
-	NOT stereo_msgs_FOUND OR
-	NOT tf2_FOUND OR
-	NOT rclcpp_FOUND
+# Use C++17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Required to detect ROS 2 environment
+find_package(ament_cmake REQUIRED)
+
+# Find dependencies listed in package.xml
+find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(stereo_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(cv_bridge REQUIRED)
+
+# Find MRPT dependency (from mrpt_libapps)
+find_package(mrpt-apps REQUIRED)
+
+# find GTest and ament_cmake_gtest
+find_package(ament_cmake_gtest REQUIRED)
+
+# Define the "lib${PROJECT_NAME}.so" shared library
+add_library(${PROJECT_NAME} SHARED
+  src/time.cpp
+  src/pose.cpp
+  src/laser_scan.cpp
+  src/map.cpp
+  src/gps.cpp
+  src/range.cpp
+  src/imu.cpp
+  src/point_cloud.cpp
+  src/point_cloud2.cpp
+  src/image.cpp
+  src/stereo_image.cpp
 )
-	message(STATUS "mrpt-ros2bridge: Skipping due to missing dependencies")
-	return()
-endif()
 
-# Additional dependencies for tests only:
-if (pcl_conversions_FOUND AND PCL_FOUND)
-	set_property(GLOBAL PROPERTY mrpt_ros2bridge_UNIT_TEST_EXTRA_DEPS ${pcl_conversions_LIBRARIES} ${PCL_COMMON_LIBRARIES})
-	set_property(GLOBAL PROPERTY mrpt_ros2bridge_UNIT_TEST_EXTRA_INCLUDE_DIRS ${pcl_conversions_INCLUDE_DIRS} ${PCL_COMMON_INCLUDE_DIRS})
-	set_property(GLOBAL PROPERTY mrpt_ros2bridge_UNIT_TEST_EXTRA_DEFINITIONS "HAVE_PCL_CONVERSIONS")
-endif()
-
-set(EXTRA_CONFIG_CMDS
-"if (NOT TARGET imp_opencv)\n\
-	add_library(imp_opencv INTERFACE IMPORTED)\n\
-	set_target_properties(imp_opencv\n\
-		PROPERTIES\n\
-		INTERFACE_INCLUDE_DIRECTORIES \"${OpenCV_INCLUDE_DIRS}\"\n\
-		INTERFACE_LINK_LIBRARIES \"${OpenCV_LIBRARIES}\"\n\
-		)\n\
-endif()\n"
+# Include directories
+target_include_directories(${PROJECT_NAME}
+  PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
 )
 
-define_mrpt_lib(
-	ros2bridge  # Lib name
-	# Dependencies:
-	mrpt-maps
-	mrpt-obs
-	# Other imported targets,
-	# which will be mapped into find_package() commands
-	# in the xxx_config.cmake script.
-	rclcpp # find_package() lib names
-	nav_msgs
-	stereo_msgs
-	sensor_msgs
-	tf2
-	cv_bridge
-	)
+# Link dependencies
+target_link_libraries(${PROJECT_NAME} PUBLIC
+  #rclcpp::rclcpp
+  #rosbag2_cpp::rosbag2_cpp
+  #tf2_msgs::tf2_msgs__rosidl_typesupport_cpp
+  cv_bridge::cv_bridge
+  geometry_msgs::geometry_msgs__rosidl_typesupport_cpp
+  mrpt::apps
+  nav_msgs::nav_msgs__rosidl_typesupport_cpp
+  sensor_msgs::sensor_msgs_library
+  std_msgs::std_msgs__rosidl_typesupport_cpp
+  stereo_msgs::stereo_msgs__rosidl_typesupport_cpp
+  tf2_geometry_msgs::tf2_geometry_msgs
+  tf2::tf2
+)
 
-if(BUILD_mrpt-ros2bridge)
-	# Add the required libraries:
-	target_link_libraries(ros2bridge PUBLIC
-		rclcpp
-		tf2
-		cv_bridge
-		sensor_msgs
-		std_msgs
-		geometry_msgs
-		stereo_msgs
-		nav_msgs
-	)
+# Installation rules
+install(
+  TARGETS ${PROJECT_NAME}
+  EXPORT export_${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
 
-	target_compile_definitions(ros2bridge PRIVATE ${ROS_DEFINITIONS})
-	target_compile_definitions(ros2bridge PRIVATE IS_MRPT_ROS2BRIDGE)
-	target_compile_definitions(ros2bridge PRIVATE CV_BRIDGE_VERSION=${cv_bridge_VERSION_HEX})
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
+
+# Export package information
+ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
+ament_export_dependencies(
+  geometry_msgs
+  sensor_msgs
+  nav_msgs
+  stereo_msgs
+  std_msgs
+  tf2
+  tf2_geometry_msgs
+  cv_bridge
+  mrpt-apps
+)
+
+# Unit tests
+if(BUILD_TESTING)
+  ament_add_gtest(test_${PROJECT_NAME}
+    src/map_unittest.cpp
+    src/pointcloud2_unittest.cpp
+    src/pose_unittest.cpp
+    src/time_unittest.cpp
+  )
+
+  if(TARGET test_${PROJECT_NAME})
+    target_link_libraries(test_${PROJECT_NAME}
+      ${PROJECT_NAME}
+    )
+  endif()
 endif()
+
+ament_package()
+
+

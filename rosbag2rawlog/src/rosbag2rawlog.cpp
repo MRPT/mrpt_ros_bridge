@@ -1,7 +1,7 @@
 /* +------------------------------------------------------------------------+
    |                             mrpt_navigation                            |
    |                                                                        |
-   | Copyright (c) 2014-2024, Individual contributors, see commit authors   |
+   | Copyright (c) 2014-2025, Individual contributors, see commit authors   |
    | See: https://github.com/mrpt-ros-pkg/mrpt_navigation                   |
    | All rights reserved. Released under BSD 3-Clause license. See LICENSE  |
    +------------------------------------------------------------------------+ */
@@ -12,11 +12,10 @@
 //             as a RawLog file, easily readable by MRPT C++ programs.
 //
 //  Started: Hunter Laux @ SEPT-2018.
-//  Maintained: JLBC @ 2018-2024
+//  Maintained: JLBC @ 2018-2025
 // ===========================================================================
 
 // MRPT:
-#include <mrpt/3rdparty/tclap/CmdLine.h>
 #include <mrpt/containers/yaml.h>
 #include <mrpt/io/CFileGZInputStream.h>
 #include <mrpt/io/CFileGZOutputStream.h>
@@ -41,6 +40,8 @@
 #include <mrpt/system/os.h>
 #include <mrpt/system/progress.h>
 #include <mrpt/version.h>
+
+#include <CLI/CLI.hpp>
 
 // mrpt pkgs:
 #include <mrpt_msgs/msg/generic_observation.hpp>
@@ -81,35 +82,52 @@ using namespace mrpt::serialization;
 using namespace mrpt::system;
 using namespace std;
 
-// Declare the supported command line switches ===========
-TCLAP::CmdLine cmd("rosbag2rawlog (ROS 2)", ' ', MRPT_getVersion().c_str());
+struct Cli
+{
+  // Declare CLI app (replaces TCLAP::CmdLine)
+  CLI::App app{"rosbag2rawlog (ROS 2) version " + std::string(MRPT_getVersion().c_str())};
 
-TCLAP::UnlabeledValueArg<std::string> arg_input_file(
-    "bags", "Input bag files (required) (*.mcap,*.db3)", true, "dataset.mcap", "Files", cmd);
+  // Define arguments ------------------------------------------------------
+  std::string input_file;
+  std::string output_file;
+  std::string config_file;
+  std::string storage_id = "mcap";
+  std::string serialization_format = "cdr";
+  bool overwrite = false;
+  std::string base_link_frame = "base_link";
 
-TCLAP::ValueArg<std::string> arg_output_file(
-    "o", "output", "Output dataset (*.rawlog)", true, "", "dataset_out.rawlog", cmd);
+  Cli()
+  {
+    // Equivalent to TCLAP::UnlabeledValueArg
+    app.add_option("bags", input_file, "Input bag files (required) (*.mcap,*.db3)")
+        ->required()
+        ->check(CLI::ExistingFile);
 
-TCLAP::ValueArg<std::string> arg_config_file(
-    "c", "config", "Config yaml file (*.yml)", true, "", "config.yml", cmd);
+    // Named options (replacing ValueArg)
+    app.add_option("-o,--output", output_file, "Output dataset (*.rawlog)")->required();
 
-TCLAP::ValueArg<std::string> arg_storage_id(
-    "", "storage-id", "rosbag2 storage_id format (sqlite3|mcap|...)", false, "mcap", "mcap", cmd);
+    app.add_option("-c,--config", config_file, "Config yaml file (*.yml)")
+        ->required()
+        ->check(CLI::ExistingFile);
 
-TCLAP::ValueArg<std::string> arg_serialization_format(
-    "", "serialization-format", "rosbag2 serialization format (cdr)", false, "cdr", "cdr", cmd);
+    app.add_option("--storage-id", storage_id, "rosbag2 storage_id format (sqlite3|mcap|...)")
+        ->default_val("mcap");
 
-TCLAP::SwitchArg arg_overwrite(
-    "w", "overwrite", "Force overwrite target file without prompting.", cmd, false);
+    app.add_option(
+           "--serialization-format", serialization_format, "rosbag2 serialization format (cdr)")
+        ->default_val("cdr");
 
-TCLAP::ValueArg<std::string> arg_base_link_frame(
-    "b",
-    "base-link",
-    "Reference /tf frame for the robot frame (Default: 'base_link')",
-    false,
-    "base_link",
-    "base_link",
-    cmd);
+    // Switch flag (replacing TCLAP::SwitchArg)
+    app.add_flag("-w,--overwrite", overwrite, "Force overwrite target file without prompting.");
+
+    app.add_option(
+           "-b,--base-link", base_link_frame,
+           "Reference /tf frame for the robot frame (Default: 'base_link')")
+        ->default_val("base_link");
+  }
+};
+
+Cli cli;
 
 std::optional<std::string> odom_from_tf_label;
 std::string odom_frame_id = "odom";
@@ -268,7 +286,7 @@ Obs toPointCloud2(
   ptsObs->timestamp = mrpt::ros2bridge::fromROS(pts.header.stamp);
 
   bool sensorPoseOK = findOutSensorPose(
-      ptsObs->sensorPose, pts.header.frame_id, arg_base_link_frame.getValue(), fixedSensorPose);
+      ptsObs->sensorPose, pts.header.frame_id, cli.base_link_frame, fixedSensorPose);
   if (!sensorPoseOK)
   {
     std::cerr << "Warning: dropping one observation of type '" << msg
@@ -357,7 +375,7 @@ Obs toLidar2D(
   scanObs->timestamp = mrpt::ros2bridge::fromROS(scan.header.stamp);
 
   bool sensorPoseOK = findOutSensorPose(
-      scanObs->sensorPose, scan.header.frame_id, arg_base_link_frame.getValue(), fixedSensorPose);
+      scanObs->sensorPose, scan.header.frame_id, cli.base_link_frame, fixedSensorPose);
   if (!sensorPoseOK)
   {
     std::cerr << "Warning: dropping one observation of type '" << msg
@@ -401,7 +419,7 @@ Obs toRotatingScan(
   obsRotScan->timestamp = mrpt::ros2bridge::fromROS(pts.header.stamp);
 
   bool sensorPoseOK = findOutSensorPose(
-      obsRotScan->sensorPose, pts.header.frame_id, arg_base_link_frame.getValue(), fixedSensorPose);
+      obsRotScan->sensorPose, pts.header.frame_id, cli.base_link_frame, fixedSensorPose);
   if (!sensorPoseOK)
   {
     std::cerr << "Warning: dropping one observation of type '" << msg
@@ -432,7 +450,7 @@ Obs toIMU(
   mrpt::ros2bridge::fromROS(imu, *mrptObs);
 
   bool sensorPoseOK = findOutSensorPose(
-      mrptObs->sensorPose, imu.header.frame_id, arg_base_link_frame.getValue(), fixedSensorPose);
+      mrptObs->sensorPose, imu.header.frame_id, cli.base_link_frame, fixedSensorPose);
   if (!sensorPoseOK)
   {
     std::cerr << "Warning: dropping one observation of type '" << msg
@@ -463,7 +481,7 @@ Obs toGPS(
   mrpt::ros2bridge::fromROS(gps, *mrptObs);
 
   bool sensorPoseOK = findOutSensorPose(
-      mrptObs->sensorPose, gps.header.frame_id, arg_base_link_frame.getValue(), fixedSensorPose);
+      mrptObs->sensorPose, gps.header.frame_id, cli.base_link_frame, fixedSensorPose);
   if (!sensorPoseOK)
   {
     std::cerr << "Warning: dropping one observation of type '" << msg
@@ -520,7 +538,7 @@ Obs toImage(
   imgObs->image = mrpt::img::CImage(cv_ptr->image, mrpt::img::DEEP_COPY);
 
   bool sensorPoseOK = findOutSensorPose(
-      imgObs->cameraPose, image->header.frame_id, arg_base_link_frame.getValue(), fixedSensorPose);
+      imgObs->cameraPose, image->header.frame_id, cli.base_link_frame, fixedSensorPose);
   if (!sensorPoseOK)
   {
     std::cerr << "Warning: dropping one observation of type '" << msg
@@ -632,15 +650,14 @@ Obs toTf(tf2::BufferCore& tfBuffer, const rosbag2_storage::SerializedBagMessage&
       addTfFrameAsKnown(tf.header.frame_id);
 
       // Process /tf -> odometry conversion, if enabled:
-      const auto baseLink = arg_base_link_frame.getValue();
+      const auto baseLink = cli.base_link_frame;
 
       if (odom_from_tf_label &&
           (tf.child_frame_id == odom_frame_id || tf.header.frame_id == odom_frame_id) &&
           (tf.child_frame_id == baseLink || tf.header.frame_id == baseLink))
       {
         mrpt::poses::CPose3D p;
-        bool valid =
-            findOutSensorPose(p, odom_frame_id, arg_base_link_frame.getValue(), std::nullopt);
+        bool valid = findOutSensorPose(p, odom_frame_id, cli.base_link_frame, std::nullopt);
         if (valid)
         {
           auto o = mrpt::obs::CObservationOdometry::Create();
@@ -817,23 +834,22 @@ int main(int argc, char** argv)
         MRPT_getCompilationDate().c_str());
 
     // Parse arguments:
-    if (!cmd.parse(argc, argv)) throw std::runtime_error("");  // should exit.
+    CLI11_PARSE(cli.app, argc, argv);
 
-    auto config = mrpt::containers::yaml::FromFile(arg_config_file.getValue());
-
-    auto input_bag_file = arg_input_file.getValue();
-    string output_rawlog_file = arg_output_file.getValue();
+    auto config = mrpt::containers::yaml::FromFile(cli.config_file);
+    auto input_bag_file = cli.input_file;
+    string output_rawlog_file = cli.output_file;
 
     // Open input ros bag:
 
     rosbag2_storage::StorageOptions storage_options;
 
     storage_options.uri = input_bag_file;
-    storage_options.storage_id = arg_storage_id.getValue();
+    storage_options.storage_id = cli.storage_id;
 
     rosbag2_cpp::ConverterOptions converter_options;
-    converter_options.input_serialization_format = arg_serialization_format.getValue();
-    converter_options.output_serialization_format = arg_serialization_format.getValue();
+    converter_options.input_serialization_format = cli.serialization_format;
+    converter_options.output_serialization_format = cli.serialization_format;
 
     rosbag2_cpp::readers::SequentialReader reader;
 
@@ -851,7 +867,7 @@ int main(int argc, char** argv)
     for (const auto& t : topics) std::cout << " " << t.name << " (" << t.type << ")\n";
 
     // Open output:
-    if (mrpt::system::fileExists(output_rawlog_file) && !arg_overwrite.isSet())
+    if (mrpt::system::fileExists(output_rawlog_file) && !cli.overwrite)
     {
       cout << "Output file already exists: `" << output_rawlog_file
            << "`, aborting. Use `-w` flag to overwrite.\n";

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.10)
 project(rosbag2rawlog)
 
 # find dependencies
@@ -12,7 +12,8 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(mrpt_msgs REQUIRED)
 
-find_package(mrpt-ros2bridge REQUIRED)
+find_package(mrpt_libros_bridge REQUIRED)
+find_package(mrpt-apps REQUIRED)
 message(STATUS "MRPT_VERSION: ${MRPT_VERSION}")
 
 if (CMAKE_COMPILER_IS_GNUCXX)
@@ -26,19 +27,17 @@ endif()
 ######################
 ## rosbag2rawlog    ##
 ######################
-find_package(mrpt-tclap REQUIRED)
+find_package(CLI11 REQUIRED)
 
 add_executable(${PROJECT_NAME}
               src/rosbag2rawlog.cpp)
 
 target_link_libraries(
   ${PROJECT_NAME}
-  mrpt::ros2bridge
-  mrpt::tclap
-)
-
-target_link_libraries(
-  ${PROJECT_NAME}
+  mrpt_libros_bridge::mrpt_libros_bridge
+  CLI11::CLI11
+  mrpt::apps
+  mrpt::containers
   rclcpp::rclcpp
   tf2::tf2
   nav_msgs::nav_msgs__rosidl_typesupport_cpp
