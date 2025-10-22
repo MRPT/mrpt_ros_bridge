@@ -33,7 +33,6 @@ add_library(${PROJECT_NAME} SHARED
   src/gps.cpp
   src/range.cpp
   src/imu.cpp
-  src/point_cloud.cpp
   src/point_cloud2.cpp
   src/image.cpp
   src/stereo_image.cpp
