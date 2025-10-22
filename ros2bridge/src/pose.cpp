@@ -20,18 +20,6 @@
  *
  */
 
-#if !defined(IS_MRPT_ROS1BRIDGE)
-// ROS1
-#include <geometry_msgs/msg/pose.hpp>
-#include <geometry_msgs/msg/pose_with_covariance.hpp>
-#include <geometry_msgs/msg/quaternion.hpp>
-#else
-// ROS2
-#include <geometry_msgs/msg/pose.hpp>
-#include <geometry_msgs/msg/pose_with_covariance.hpp>
-#include <geometry_msgs/msg/quaternion.hpp>
-#endif
-
 #include <mrpt/core/exceptions.h>
 #include <mrpt/math/CQuaternion.h>
 #include <mrpt/math/TPose2D.h>
@@ -43,11 +31,10 @@
 #include <mrpt/poses/CPosePDFGaussianInf.h>
 #include <mrpt/ros2bridge/pose.h>
 
-#if TF2_VERSION >= 0x004201
+#include <geometry_msgs/msg/pose.hpp>
+#include <geometry_msgs/msg/pose_with_covariance.hpp>
+#include <geometry_msgs/msg/quaternion.hpp>
 #include <tf2/LinearMath/Matrix3x3.hpp>
-#else
-#include <tf2/LinearMath/Matrix3x3.h>
-#endif
 
 // MRPT -> ROS functions:
 tf2::Matrix3x3 mrpt::ros2bridge::toROS(const mrpt::math::CMatrixDouble33& src)
