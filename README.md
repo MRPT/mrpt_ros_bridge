@@ -102,9 +102,7 @@ mrpt::ros2bridge::toROS(mrpt_pose, ros_pose);
 
 ### 2. Converting a ROS 2 bag to MRPT rawlog
 
-```bash
-ros2 run rosbag2rawlog rosbag2rawlog input_bag_directory --output=dataset.rawlog
-```
+Refer to the [dataset conversions page](https://docs.mola-slam.org/latest/dataset-conversions.html) on the MOLA project website.
 
 ---
 
