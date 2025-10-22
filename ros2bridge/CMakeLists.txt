@@ -108,8 +108,6 @@ endif()
 
 ament_package()
 
-
-
 # NOTE: Remove this when cv_bridge versions are >3.4.0 on all ROS distros.
 
 # ===================================================================================================
@@ -149,3 +147,39 @@ mrpt_version_to_hex(cv_bridge_VERSION  cv_bridge_VERSION_HEX)
 target_compile_definitions(${PROJECT_NAME} PRIVATE CV_BRIDGE_VERSION=${cv_bridge_VERSION_HEX})
 # ===================================================================================================
 
+
+# === Export a standard CMake config file for backwards compatibility from MRPT2 ===
+include(CMakePackageConfigHelpers)
+
+# Create an alias target so users can link with mrpt::ros2bridge
+add_library(mrpt::ros2bridge ALIAS ${PROJECT_NAME})
+
+# Project version: autodetect from caller package.xml
+# Example line:" <version>0.3.2</version>"
+file(READ ${CMAKE_SOURCE_DIR}/package.xml contentPackageXML)
+string(REGEX MATCH "<version>([0-9\.]*)</version>" _ ${contentPackageXML})
+set(MRPT_ROS2BRIDGE_VERSION ${CMAKE_MATCH_1})
+message(STATUS "MRPT_ROS2BRIDGE_VERSION version: ${MRPT_ROS2BRIDGE_VERSION} (detected in package.xml)")
+
+
+# Generate a simple config file that re-exports the target
+configure_package_config_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/mrpt-ros2bridge-config.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/mrpt-ros2bridge-config.cmake"
+  INSTALL_DESTINATION lib/cmake/mrpt-ros2bridge
+)
+
+# Generate an accompanying version file
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/mrpt-ros2bridge-config-version.cmake"
+  VERSION ${MRPT_ROS2BRIDGE_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+
+# Install both config and version files
+install(
+  FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/mrpt-ros2bridge-config.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/mrpt-ros2bridge-config-version.cmake"
+  DESTINATION lib/cmake/mrpt-ros2bridge
+)
