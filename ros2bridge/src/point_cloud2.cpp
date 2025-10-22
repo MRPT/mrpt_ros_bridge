@@ -55,12 +55,18 @@ void get_float_from_field(
   if (field != nullptr)
   {
     if (field->datatype == sensor_msgs::msg::PointField::FLOAT32)
+    {
       output = *(reinterpret_cast<const float*>(&data[field->offset]));
+    }
     else if (field->datatype == sensor_msgs::msg::PointField::FLOAT64)
+    {
       output = static_cast<float>(*(reinterpret_cast<const double*>(&data[field->offset])));
+    }
   }
   else
+  {
     output = 0.0;
+  }
 }
 
 void get_double_from_field(
@@ -69,12 +75,18 @@ void get_double_from_field(
   if (field != nullptr)
   {
     if (field->datatype == sensor_msgs::msg::PointField::FLOAT32)
+    {
       output = static_cast<double>(*(reinterpret_cast<const float*>(&data[field->offset])));
+    }
     else if (field->datatype == sensor_msgs::msg::PointField::FLOAT64)
+    {
       output = *(reinterpret_cast<const double*>(&data[field->offset]));
+    }
   }
   else
+  {
     output = 0.0;
+  }
 }
 
 void get_uint16_from_field(
@@ -83,12 +95,18 @@ void get_uint16_from_field(
   if (field != nullptr)
   {
     if (field->datatype == sensor_msgs::msg::PointField::UINT16)
+    {
       output = *(reinterpret_cast<const uint16_t*>(&data[field->offset]));
+    }
     else if (field->datatype == sensor_msgs::msg::PointField::UINT8)
+    {
       output = *(reinterpret_cast<const uint8_t*>(&data[field->offset]));
+    }
   }
   else
+  {
     output = 0;
+  }
 }
 void get_uint32_from_field(
     const sensor_msgs::msg::PointField* field, const unsigned char* data, uint32_t& output)
@@ -96,17 +114,24 @@ void get_uint32_from_field(
   if (field != nullptr)
   {
     if (field->datatype == sensor_msgs::msg::PointField::UINT32)
+    {
       output = *(reinterpret_cast<const uint32_t*>(&data[field->offset]));
+    }
   }
   else
+  {
     output = 0;
+  }
 }
 }  // namespace
 
 std::set<std::string> mrpt::ros2bridge::extractFields(const sensor_msgs::msg::PointCloud2& msg)
 {
   std::set<std::string> lst;
-  for (const auto& f : msg.fields) lst.insert(f.name);
+  for (const auto& f : msg.fields)
+  {
+    lst.insert(f.name);
+  }
   return lst;
 }
 
@@ -131,7 +156,10 @@ bool mrpt::ros2bridge::fromROS(const sensor_msgs::msg::PointCloud2& msg, CSimple
     incompatible |= check_field(msg.fields[i], "z", &z_field);
   }
 
-  if (incompatible || (!x_field || !y_field || !z_field)) return false;
+  if (incompatible || (!x_field || !y_field || !z_field))
+  {
+    return false;
+  }
 
   // If not, memcpy each group of contiguous fields separately
   for (unsigned int row = 0; row < msg.height; ++row)
@@ -171,7 +199,10 @@ bool mrpt::ros2bridge::fromROS(const sensor_msgs::msg::PointCloud2& msg, CPoints
     incompatible |= check_field(msg.fields[i], "intensity", &i_field);
   }
 
-  if (incompatible || (!x_field || !y_field || !z_field || !i_field)) return false;
+  if (incompatible || (!x_field || !y_field || !z_field || !i_field))
+  {
+    return false;
+  }
 
   for (unsigned int row = 0; row < msg.height; ++row)
   {
@@ -214,7 +245,10 @@ bool mrpt::ros2bridge::fromROS(const sensor_msgs::msg::PointCloud2& msg, CPoints
     incompatible |= check_field(msg.fields[i], "t", &t_field);
   }
 
-  if (incompatible || (!x_field || !y_field || !z_field)) return false;
+  if (incompatible || (!x_field || !y_field || !z_field))
+  {
+    return false;
+  }
 
   obj.resize_XYZIRT(num_points, !!i_field, !!r_field, !!t_field);
 
@@ -269,7 +303,10 @@ bool mrpt::ros2bridge::fromROS(const sensor_msgs::msg::PointCloud2& msg, CPoints
         if (std::abs(t) > 5.0)
         {
           // It looks like absolute timestamps, convert to relative:
-          if (!baseTimeStamp) baseTimeStamp = t;
+          if (!baseTimeStamp)
+          {
+            baseTimeStamp = t;
+          }
           obj.setPointTime(idx, static_cast<float>(t - *baseTimeStamp));
         }
         else
@@ -282,6 +319,144 @@ bool mrpt::ros2bridge::fromROS(const sensor_msgs::msg::PointCloud2& msg, CPoints
   }
   return true;
 }
+
+#if MRPT_VERSION >= 0x20f00  // 2.15.0
+bool mrpt::ros2bridge::fromROS(
+    const sensor_msgs::msg::PointCloud2& msg, mrpt::maps::CGenericPointsMap& obj)
+{
+  // Copy point data
+  unsigned int num_points = msg.width * msg.height;
+
+  bool incompatible = false;
+  const sensor_msgs::msg::PointField* x_field = nullptr;
+  const sensor_msgs::msg::PointField* y_field = nullptr;
+  const sensor_msgs::msg::PointField* z_field = nullptr;
+  const sensor_msgs::msg::PointField* t_field = nullptr;
+  std::map<std::string, const sensor_msgs::msg::PointField*> other_fields_float;
+  std::map<std::string, const sensor_msgs::msg::PointField*> other_fields_uint;
+
+  for (const auto& field : msg.fields)
+  {
+    if (field.name == "x" || field.name == "y" || field.name == "z")
+    {
+      incompatible |= check_field(field, "x", &x_field);
+      incompatible |= check_field(field, "y", &y_field);
+      incompatible |= check_field(field, "z", &z_field);
+      continue;
+    }
+
+    // Timestamp per point must be handled specially to handle different conventions:
+    if (field.name == "timestamp" || field.name == "time" || field.name == "t")
+    {
+      incompatible |= check_field(field, "timestamp", &t_field);
+      incompatible |= check_field(field, "time", &t_field);
+      incompatible |= check_field(field, "t", &t_field);
+      continue;
+    }
+
+    if (field.datatype == sensor_msgs::msg::PointField::FLOAT32 ||
+        field.datatype == sensor_msgs::msg::PointField::FLOAT64)
+    {
+      other_fields_float[field.name] = &field;
+    }
+    else if (
+        field.datatype == sensor_msgs::msg::PointField::UINT16 ||
+        field.datatype == sensor_msgs::msg::PointField::UINT32 ||
+        field.datatype == sensor_msgs::msg::PointField::UINT8)
+    {
+      other_fields_uint[field.name] = &field;
+    }
+  }
+
+  if (incompatible || (!x_field || !y_field || !z_field))
+  {
+    return false;
+  }
+
+  for (const auto& [name, _] : other_fields_float)
+  {
+    obj.registerField_float(name);
+  }
+  for (const auto& [name, _] : other_fields_uint)
+  {
+    obj.registerField_uint16(name);
+  }
+  if (t_field)
+  {
+    obj.registerField_float("t");
+  }
+
+  obj.resize(num_points);
+
+  unsigned int idx = 0;
+  std::optional<double> baseTimeStamp;
+  for (unsigned int row = 0; row < msg.height; ++row)
+  {
+    const unsigned char* row_data = &msg.data[static_cast<std::size_t>(row) * msg.row_step];
+    for (uint32_t col = 0; col < msg.width; ++col, ++idx)
+    {
+      const unsigned char* msg_data = row_data + static_cast<std::size_t>(col) * msg.point_step;
+
+      float x = 0, y = 0, z = 0;
+      get_float_from_field(x_field, msg_data, x);
+      get_float_from_field(y_field, msg_data, y);
+      get_float_from_field(z_field, msg_data, z);
+      obj.setPointFast(idx, x, y, z);
+
+      for (const auto& [name, field_ptr] : other_fields_float)
+      {
+        float val = 0;
+        get_float_from_field(field_ptr, msg_data, val);
+        obj.setPointField_float(idx, name, val);
+      }
+      for (const auto& [name, field_ptr] : other_fields_uint)
+      {
+        uint16_t val = 0;
+        get_uint16_from_field(field_ptr, msg_data, val);
+        obj.setPointField_uint16(idx, name, val);
+      }
+
+      if (t_field)
+      {
+        double t = 0;
+
+        if (t_field->datatype == sensor_msgs::msg::PointField::FLOAT32 ||
+            t_field->datatype == sensor_msgs::msg::PointField::FLOAT64)
+        {
+          get_double_from_field(t_field, msg_data, t);
+        }
+        else
+        {
+          uint32_t tim = 0;
+
+          get_uint32_from_field(t_field, msg_data, tim);
+
+          // Convention: they seem to be nanoseconds:
+          t = tim * 1e-9;
+        }
+
+        // If the sensor uses absolute timestamp, convert them to relative
+        // since otherwise precision is lost in the double->float conversion:
+        if (std::abs(t) > 5.0)
+        {
+          // It looks like absolute timestamps, convert to relative:
+          if (!baseTimeStamp)
+          {
+            baseTimeStamp = t;
+          }
+          obj.setPointField_float(idx, "t", static_cast<float>(t - *baseTimeStamp));
+        }
+        else
+        {
+          // It looks relative timestamps:
+          obj.setPointField_float(idx, "t", static_cast<float>(t));
+        }
+      }
+    }
+  }
+  return true;
+}
+#endif
 
 bool mrpt::ros2bridge::toROS(
     const CSimplePointsMap& obj,
@@ -468,11 +643,20 @@ bool mrpt::ros2bridge::toROS(
     memcpy(pointDest + offsets[f++], &ys[i], sizeof(float));
     memcpy(pointDest + offsets[f++], &zs[i], sizeof(float));
 
-    if (obj.hasIntensityField()) memcpy(pointDest + offsets[f++], &Is[i], sizeof(float));
+    if (obj.hasIntensityField())
+    {
+      memcpy(pointDest + offsets[f++], &Is[i], sizeof(float));
+    }
 
-    if (obj.hasTimeField()) memcpy(pointDest + offsets[f++], &Ts[i], sizeof(float));
+    if (obj.hasTimeField())
+    {
+      memcpy(pointDest + offsets[f++], &Ts[i], sizeof(float));
+    }
 
-    if (obj.hasRingField()) memcpy(pointDest + offsets[f++], &Rs[i], sizeof(uint16_t));
+    if (obj.hasRingField())
+    {
+      memcpy(pointDest + offsets[f++], &Rs[i], sizeof(uint16_t));
+    }
 
     pointDest += msg.point_step;
   }
@@ -552,7 +736,10 @@ bool mrpt::ros2bridge::fromROS(
   obj.sensorPose = sensorPoseOnRobot;
 
   // Default unit: 1cm
-  if (obj.rangeResolution == 0) obj.rangeResolution = 1e-2;
+  if (obj.rangeResolution == 0)
+  {
+    obj.rangeResolution = 1e-2;
+  }
 
   if (i_field)
   {
@@ -560,7 +747,9 @@ bool mrpt::ros2bridge::fromROS(
     obj.intensityImage.fill(0);
   }
   else
+  {
     obj.intensityImage.resize(0, 0);
+  }
 
   if (inputCloudIsOrganized)
   {
@@ -609,7 +798,10 @@ bool mrpt::ros2bridge::fromROS(
         obj.intensityImage(ring_id, az_idx) = lround(255 * intensity / max_intensity);
       }
 
-      if (inputCloudIsOrganized) obj.organizedPoints(ring_id, az_idx) = localPt;
+      if (inputCloudIsOrganized)
+      {
+        obj.organizedPoints(ring_id, az_idx) = localPt;
+      }
     }
   }
 

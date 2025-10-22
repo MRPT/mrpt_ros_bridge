@@ -41,6 +41,10 @@
 #include <mrpt/system/progress.h>
 #include <mrpt/version.h>
 
+#if MRPT_VERSION >= 0x20f00  // 2.15.0
+#include <mrpt/maps/CGenericPointsMap.h>
+#endif
+
 #include <CLI/CLI.hpp>
 
 // mrpt pkgs:
@@ -298,7 +302,25 @@ Obs toPointCloud2(
   std::set<std::string> fields = mrpt::ros2bridge::extractFields(pts);
 
   // We need X Y Z:
-  if (!fields.count("x") || !fields.count("y") || !fields.count("z")) return {};
+  if (!fields.count("x") || !fields.count("y") || !fields.count("z"))
+  {
+    return {};
+  }
+
+#if MRPT_VERSION >= 0x020f00  // 2.15.0 introduced CGenericPointsMap
+  {
+    auto mrptPts = mrpt::maps::CGenericPointsMap::Create();
+    ptsObs->pointcloud = mrptPts;
+
+    if (!mrpt::ros2bridge::fromROS(pts, *mrptPts))
+    {
+      THROW_EXCEPTION("Could not convert pointcloud from ROS to CGenericPointsMap");
+    }
+
+    // converted ok:
+    return {ptsObs};
+  }
+#endif
 
 #if MRPT_VERSION >= 0x020b04
   if (fields.count("ring") || fields.count("time"))
@@ -311,10 +333,9 @@ Obs toPointCloud2(
     {
       THROW_EXCEPTION("Could not convert pointcloud from ROS to CPointsMapXYZIRT");
     }
-    else
-    {  // converted ok:
-      return {ptsObs};
-    }
+
+    // converted ok:
+    return {ptsObs};
   }
 #endif
 
