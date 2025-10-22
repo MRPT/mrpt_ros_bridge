@@ -31,7 +31,7 @@ namespace mrpt::ros2bridge
  *  Only (x,y,z) data is converted. To use the intensity channel, see
  * the alternative signatures for CPointsMapXYZI or CPointsMapXYZIRT
  * Requires point cloud fields: x,y,z.
- * \return true on sucessful conversion, false on any error.
+ * \return true on successful conversion, false on any error.
  * \sa toROS
  */
 bool fromROS(const sensor_msgs::msg::PointCloud2& msg, mrpt::maps::CSimplePointsMap& obj);
@@ -73,7 +73,7 @@ std::set<std::string> extractFields(const sensor_msgs::msg::PointCloud2& msg);
  *
  * Generated sensor_msgs::PointCloud2::channels: `x`, `y`, `z`.
  *
- * \return true on sucessful conversion, false on any error.
+ * \return true on successful conversion, false on any error.
  * \sa fromROS
  */
 bool toROS(
@@ -82,7 +82,7 @@ bool toROS(
     sensor_msgs::msg::PointCloud2& msg);
 
 /** \overload With these fields: `x`, `y`, `z`, `intensity`
- * \return true on sucessful conversion, false on any error.
+ * \return true on successful conversion, false on any error.
  * \sa fromROS
  */
 bool toROS(

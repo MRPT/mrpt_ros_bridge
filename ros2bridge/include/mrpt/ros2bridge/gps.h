@@ -32,7 +32,7 @@ namespace mrpt::ros2bridge
  * @{ */
 
 /** Convert sensor_msgs/NavSatFix -> mrpt::obs::CObservationGPS
- * \return true on sucessful conversion, false on any error.
+ * \return true on successful conversion, false on any error.
  */
 bool fromROS(const sensor_msgs::msg::NavSatFix& msg, mrpt::obs::CObservationGPS& obj);
 
@@ -40,7 +40,7 @@ bool fromROS(const sensor_msgs::msg::NavSatFix& msg, mrpt::obs::CObservationGPS&
  *  The user must supply the "msg_header" field to be copied into the output
  * message object, since that part does not appear in MRPT classes.
  *
- * \return true on sucessful conversion, only if the input observation has a GGA
+ * \return true on successful conversion, only if the input observation has a GGA
  * message.
  */
 bool toROS(

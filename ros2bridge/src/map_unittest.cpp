@@ -74,8 +74,12 @@ TEST(Map, check_ros2mrpt_and_back)
   ASSERT_TRUE(mrpt::ros2bridge::toROS(desMrpt, desRos, desRos.header));
   // all -1 entries should map back to -1
   for (uint32_t h = 0; h < srcRos.info.width; h++)
+  {
     for (uint32_t w = 0; w < srcRos.info.width; w++)
+    {
       EXPECT_EQ(desRos.data[h * srcRos.info.width + h], -1);
+    }
+  }
 
   // Test gridmap with values: 0 to 100
   for (int i = 0; i <= 100; i++)
@@ -92,8 +96,8 @@ TEST(Map, check_ros2mrpt_and_back)
     /*printf(
       "%4i, %4.3f = %4.3f,%4i\n", srcRos.data[i], 1.0f - 0.01f * i,
       desMrpt.getCell(i, 0), desRos.data[i]); */
-    EXPECT_NEAR(1.0f - 0.01f * i, desMrpt.getCell(i, 0), 0.03f) << "ros to mprt"
+    EXPECT_NEAR(1.0f - 0.01f * i, desMrpt.getCell(i, 0), 0.03f) << "ros to mrpt"
                                                                 << "i=" << i;
-    EXPECT_NEAR(srcRos.data[i], desRos.data[i], 1) << "ros to mprt to ros";
+    EXPECT_NEAR(srcRos.data[i], desRos.data[i], 1) << "ros to mrpt to ros";
   }
 }

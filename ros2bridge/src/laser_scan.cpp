@@ -42,9 +42,13 @@ bool mrpt::ros2bridge::fromROS(
     // in MRPT they go from -FOV/2 to +FOV/2.
     int i_ros = inv_ang_step * (-fov05 - msg.angle_min + ang_step * i_mrpt);
     if (i_ros < 0)
+    {
       i_ros += N;
+    }
     else if (i_ros >= (int)N)
+    {
       i_ros -= N;  // wrap around 2PI...
+    }
 
     // set the scan
     const float r = msg.ranges[i_ros];
@@ -63,7 +67,10 @@ bool mrpt::ros2bridge::toROS(
     const mrpt::obs::CObservation2DRangeScan& obj, sensor_msgs::msg::LaserScan& msg)
 {
   const size_t nRays = obj.getScanSize();
-  if (!nRays) return false;
+  if (!nRays)
+  {
+    return false;
+  }
 
   msg.angle_min = -0.5f * obj.aperture;
   msg.angle_max = 0.5f * obj.aperture;
@@ -77,7 +84,10 @@ bool mrpt::ros2bridge::toROS(
   msg.range_max = obj.maxRange;
 
   msg.ranges.resize(nRays);
-  for (size_t i = 0; i < nRays; i++) msg.ranges[i] = obj.getScanRange(i);
+  for (size_t i = 0; i < nRays; i++)
+  {
+    msg.ranges[i] = obj.getScanRange(i);
+  }
 
   // Set header data:
   msg.header.stamp = toROS(obj.timestamp);

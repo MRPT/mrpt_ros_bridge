@@ -12,10 +12,8 @@
 #include <mrpt/obs/obs_frwds.h>
 #include <mrpt/poses/poses_frwds.h>
 
-#include <cstdint>
 #include <geometry_msgs/msg/pose.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
-#include <string>
 
 namespace mrpt::ros2bridge
 {
@@ -24,7 +22,7 @@ namespace mrpt::ros2bridge
 
 /** ROS->MRPT: Takes a sensor_msgs::msg::LaserScan and the relative pose of the
  * laser wrt base_link and builds a CObservation2DRangeScan \return true on
- * sucessful conversion, false on any error. \sa toROS
+ * successful conversion, false on any error. \sa toROS
  */
 bool fromROS(
     const sensor_msgs::msg::LaserScan& msg,
@@ -33,14 +31,14 @@ bool fromROS(
 
 /** MRPT->ROS: Takes a CObservation2DRangeScan and outputs range data in
  * sensor_msgs::msg::LaserScan
- * \return true on sucessful conversion, false on any error.
+ * \return true on successful conversion, false on any error.
  * \sa fromROS
  */
 bool toROS(const mrpt::obs::CObservation2DRangeScan& obj, sensor_msgs::msg::LaserScan& msg);
 
 /** MRPT->ROS: Takes a CObservation2DRangeScan and outputs range data in
  * sensor_msgs::msg::LaserScan + the relative pose of the laser wrt base_link
- * \return true on sucessful conversion, false on any error.
+ * \return true on successful conversion, false on any error.
  * \sa fromROS
  */
 bool toROS(

@@ -51,9 +51,15 @@ class MapHdl
   static MapHdl* instance();
 
 #ifdef OCCUPANCY_GRIDMAP_CELL_SIZE_8BITS
-  int8_t cellMrpt2Ros(int8_t i) { return lut_cellmrpt2ros[static_cast<int>(i) - INT8_MIN]; }
+  int8_t cellMrpt2Ros(int8_t i)
+  {
+    return static_cast<int8_t>(lut_cellmrpt2ros[static_cast<int>(i) - INT8_MIN]);
+  }
 #else
-  int16_t cellMrpt2Ros(int16_t i) { return lut_cellmrpt2ros[static_cast<int>(i) - INT16_MIN]; }
+  int16_t cellMrpt2Ros(int16_t i)
+  {
+    return static_cast<int16_t>(lut_cellmrpt2ros[static_cast<int>(i) - INT16_MIN]);
+  }
 #endif
   int8_t cellRos2Mrpt(int8_t i)
   {
@@ -63,7 +69,7 @@ class MapHdl
       return 0;
     }
     ASSERT_LE_(i, 100);
-    return lut_cellros2mrpt[i];
+    return static_cast<int8_t>(lut_cellros2mrpt[i]);
   }
 
   /**
@@ -85,7 +91,7 @@ class MapHdl
 
 /**
  * converts ros msg to mrpt object
- * @return true on sucessful conversion, false on any error.
+ * @return true on successful conversion, false on any error.
  * @param src
  * @param des
  */
@@ -93,7 +99,7 @@ bool fromROS(const nav_msgs::msg::OccupancyGrid& src, mrpt::maps::COccupancyGrid
 
 /**
  * converts mrpt object to ros msg and updates the msg header
- * @return true on sucessful conversion, false on any error.
+ * @return true on successful conversion, false on any error.
  * @param src
  * @param header
  * @param as_costmap If set to true, gridmap cell values will be copied without changes
@@ -106,7 +112,7 @@ bool toROS(
     bool as_costmap = false);
 /**
  * converts mrpt object to ros msg
- * @return true on sucessful conversion, false on any error.
+ * @return true on successful conversion, false on any error.
  */
 bool toROS(
     const mrpt::maps::COccupancyGridMap2D& src,

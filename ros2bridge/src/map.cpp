@@ -101,7 +101,10 @@ bool mrpt::ros2bridge::fromROS(const nav_msgs::msg::OccupancyGrid& src, COccupan
   {
     COccupancyGridMap2D::cellType* pDes = des.getRow(h);
     const int8_t* pSrc = &src.data[h * src.info.width];
-    for (unsigned int w = 0; w < src.info.width; w++) *pDes++ = inst->cellRos2Mrpt(*pSrc++);
+    for (unsigned int w = 0; w < src.info.width; w++)
+    {
+      *pDes++ = inst->cellRos2Mrpt(*pSrc++);
+    }
   }
   return true;
   MRPT_END
@@ -142,9 +145,13 @@ bool mrpt::ros2bridge::toROS(
     for (unsigned int w = 0; w < des.info.width; w++)
     {
       if (as_costmap)
+      {
         *pDes++ = static_cast<int8_t>(*pSrc++);
+      }
       else
+      {
         *pDes++ = MapHdl::instance()->cellMrpt2Ros(*pSrc++);
+      }
     }
   }
   return true;
@@ -166,54 +173,77 @@ bool MapHdl::loadMap(
 
   // Load the set of metric maps to consider in the experiments:
   _metric_map.setListOfMaps(mapInitializers);
-  if (_debug) mapInitializers.dumpToConsole();
+  if (_debug)
+  {
+    mapInitializers.dumpToConsole();
+  }
 
-  if (_debug) printf("%s, _map_file.size() = %zu\n", _map_file.c_str(), _map_file.size());
+  if (_debug)
+  {
+    printf("%s, _map_file.size() = %zu\n", _map_file.c_str(), _map_file.size());
+  }
   // Load the map (if any):
   if (_map_file.size() < 3)
   {
-    if (_debug) printf("No mrpt map file!\n");
+    if (_debug)
+    {
+      printf("No mrpt map file!\n");
+    }
     return false;
+  }
+
+  ASSERT_(mrpt::system::fileExists(_map_file));
+
+  // Detect file extension:
+  std::string mapExt = mrpt::system::lowerCase(
+      mrpt::system::extractFileExtension(_map_file, true));  // Ignore possible .gz extensions
+
+  if (!mapExt.compare("simplemap"))
+  {
+    // It's a ".simplemap":
+    if (_debug)
+    {
+      printf("Loading '.simplemap' file...");
+    }
+    CFileGZInputStream f(_map_file);
+    mrpt::serialization::archiveFrom(f) >> simpleMap;
+
+    ASSERTMSG_(simpleMap.size() > 0, "Simplemap was aparently loaded OK, but it is empty!");
+
+    // Build metric map:
+    if (_debug)
+    {
+      printf("Building metric map(s) from '.simplemap'...");
+    }
+    _metric_map.loadFromSimpleMap(simpleMap);
+    if (_debug)
+    {
+      printf("Ok\n");
+    }
+  }
+  else if (!mapExt.compare("gridmap"))
+  {
+    // It's a ".gridmap":
+    if (_debug)
+    {
+      printf("Loading gridmap from '.gridmap'...");
+    }
+    ASSERTMSG_(
+        _metric_map.countMapsByClass<COccupancyGridMap2D>() == 1,
+        "Error: Trying to load a gridmap into a multi-metric map "
+        "requires 1 gridmap member.");
+    CFileGZInputStream fm(_map_file);
+    mrpt::serialization::archiveFrom(fm) >> (*_metric_map.mapByClass<COccupancyGridMap2D>());
+    if (_debug)
+    {
+      printf("Ok\n");
+    }
   }
   else
   {
-    ASSERT_(mrpt::system::fileExists(_map_file));
-
-    // Detect file extension:
-    std::string mapExt = mrpt::system::lowerCase(
-        mrpt::system::extractFileExtension(_map_file, true));  // Ignore possible .gz extensions
-
-    if (!mapExt.compare("simplemap"))
-    {
-      // It's a ".simplemap":
-      if (_debug) printf("Loading '.simplemap' file...");
-      CFileGZInputStream f(_map_file);
-      mrpt::serialization::archiveFrom(f) >> simpleMap;
-
-      ASSERTMSG_(simpleMap.size() > 0, "Simplemap was aparently loaded OK, but it is empty!");
-
-      // Build metric map:
-      if (_debug) printf("Building metric map(s) from '.simplemap'...");
-      _metric_map.loadFromSimpleMap(simpleMap);
-      if (_debug) printf("Ok\n");
-    }
-    else if (!mapExt.compare("gridmap"))
-    {
-      // It's a ".gridmap":
-      if (_debug) printf("Loading gridmap from '.gridmap'...");
-      ASSERTMSG_(
-          _metric_map.countMapsByClass<COccupancyGridMap2D>() == 1,
-          "Error: Trying to load a gridmap into a multi-metric map "
-          "requires 1 gridmap member.");
-      CFileGZInputStream fm(_map_file);
-      mrpt::serialization::archiveFrom(fm) >> (*_metric_map.mapByClass<COccupancyGridMap2D>());
-      if (_debug) printf("Ok\n");
-    }
-    else
-    {
-      THROW_EXCEPTION(mrpt::format("Map file has unknown extension: '%s'", mapExt.c_str()));
-      return false;
-    }
+    THROW_EXCEPTION(mrpt::format("Map file has unknown extension: '%s'", mapExt.c_str()));
+    return false;
   }
+
   return true;
 }

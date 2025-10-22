@@ -32,7 +32,7 @@ namespace mrpt::ros2bridge
 
 /** Convert sensor_msgs/Imu -> mrpt::obs::CObservationIMU
  * // STILL NEED TO WRITE CODE FOR COVARIANCE
- * \return true on sucessful conversion, false on any error.
+ * \return true on successful conversion, false on any error.
  */
 bool fromROS(const sensor_msgs::msg::Imu& msg, mrpt::obs::CObservationIMU& obj);
 
@@ -40,8 +40,8 @@ bool fromROS(const sensor_msgs::msg::Imu& msg, mrpt::obs::CObservationIMU& obj);
  *  The user must supply the "msg_header" field to be copied into the output
  * message object, since that part does not appear in MRPT classes.
  *
- *  Since COnservationIMU does not contain covariance terms NEED TO fix those.
- * \return true on sucessful conversion, false on any error.
+ *  Since CObservationIMU does not contain covariance terms NEED TO fix those.
+ * \return true on successfull conversion, false on any error.
  */
 bool toROS(
     const mrpt::obs::CObservationIMU& obj,

@@ -29,7 +29,7 @@ namespace mrpt::ros2bridge
  * @{ */
 
 /** Convert sensor_msgs/Range -> mrpt::obs::CObservationRange
- * \return true on sucessful conversion, false on any error.
+ * \return true on successful conversion, false on any error.
  */
 bool fromROS(const sensor_msgs::msg::Range& msg, mrpt::obs::CObservationRange& obj);
 
@@ -39,7 +39,7 @@ bool fromROS(const sensor_msgs::msg::Range& msg, mrpt::obs::CObservationRange& o
  *
  *  Since COnservation does not contain "radiation_type",
  * sensor_msgs::msg::Range::radiation_type will be empty. \return true on
- * sucessful conversion, false on any error.
+ * successful conversion, false on any error.
  */
 bool toROS(
     const mrpt::obs::CObservationRange& obj,

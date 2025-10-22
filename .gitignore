@@ -1,6 +1,7 @@
 *~
 build*
 install*
+log
 *.layout
 CMakeFiles/
 CMakeLists.txt.user*
@@ -20,12 +21,6 @@ compile_commands.json
 .mypy_cache/
 tags
 
-# common results directories
-graphslam_results/
-
-#visual studio
-.vs/*
-.vscode
 
 # doxygen files
 doc/source/dox_mrpt.tag
@@ -43,3 +38,12 @@ doc/source/doxygen-index.rst
 .cmake
 doc/venv
 .pc
+
+
+#visual studio
+.vs/*
+.vscode/*
+!.vscode/settings.json
+**/.vscode
+.cache
+
