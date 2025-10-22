@@ -14,7 +14,7 @@ set +e
 set +x
 
 DIRS_IN="ros2bridge rosbag2rawlog"
-DIRS_OUT=""
+DIRS_OUT="x"
 LANGS=cpp
 FORMAT_CODE_BIN=".github/clang_git_format/format_code.py"
 
