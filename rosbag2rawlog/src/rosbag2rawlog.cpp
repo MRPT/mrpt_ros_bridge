@@ -41,6 +41,7 @@
 #include <mrpt/system/filesystem.h>
 #include <mrpt/system/os.h>
 #include <mrpt/system/progress.h>
+#include <mrpt/version.h>
 #include <nav_msgs/Odometry.h>
 #include <rosbag/bag.h>  // rosbag_storage C++ lib
 #include <rosbag/view.h>
@@ -56,6 +57,10 @@
 #include <tf2/exceptions.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>  // needed by tf2::fromMsg()
 #include <tf2_msgs/TFMessage.h>
+
+#if MRPT_VERSION >= 0x20f00  // 2.15.0
+#include <mrpt/maps/CGenericPointsMap.h>
+#endif
 
 #include <memory>
 
@@ -250,7 +255,25 @@ Obs toPointCloud2(
   std::set<std::string> fields = mrpt::ros1bridge::extractFields(*pts);
 
   // We need X Y Z:
-  if (!fields.count("x") || !fields.count("y") || !fields.count("z")) return {};
+  if (!fields.count("x") || !fields.count("y") || !fields.count("z"))
+  {
+    return {};
+  }
+
+#if MRPT_VERSION >= 0x020f00  // 2.15.0 introduced CGenericPointsMap
+  {
+    auto mrptPts = mrpt::maps::CGenericPointsMap::Create();
+    ptsObs->pointcloud = mrptPts;
+
+    if (!mrpt::ros1bridge::fromROS(pts, *mrptPts))
+    {
+      THROW_EXCEPTION("Could not convert pointcloud from ROS to CGenericPointsMap");
+    }
+
+    // converted ok:
+    return {ptsObs};
+  }
+#endif
 
   if (fields.count("ring") || fields.count("time"))
   {

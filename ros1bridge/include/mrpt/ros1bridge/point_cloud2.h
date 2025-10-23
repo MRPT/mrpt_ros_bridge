@@ -14,8 +14,12 @@
 #include <mrpt/maps/CPointsMapXYZIRT.h>
 #include <mrpt/maps/CSimplePointsMap.h>
 #include <mrpt/obs/CObservationRotatingScan.h>
+#include <mrpt/version.h>
 #include <sensor_msgs/PointCloud2.h>
 
+#if MRPT_VERSION >= 0x20f00  // 2.15.0
+#include <mrpt/maps/CGenericPointsMap.h>
+#endif
 #include <set>
 #include <string>
 
@@ -55,6 +59,27 @@ bool fromROS(
     const mrpt::poses::CPose3D& sensorPoseOnRobot,
     unsigned int num_azimuth_divisions = 360,
     float max_intensity = 1000.0f);
+
+#if MRPT_VERSION >= 0x20f00  // 2.15.0
+
+/** Convert sensor_msgs/PointCloud2 to mrpt::maps::CGenericPointsMap.
+ *
+ * Conventions for ROS2 input PointCloud2 message fields:
+ *  - Mandatory: x,y,z (float32)
+ *  - Optional: timestamp/time/t (float32 or float64 [seconds], or uint32/uint64 [nanoseconds])
+ *  - Other fields: float32, float64 (-> will be converted to float32), uint8, uint16, uint32 (->
+ *    will be converted to uint16).
+ *
+ * @param msg Input ROS2 PointCloud2 message
+ * @param obj Output MRPT CGenericPointsMap object. Note that its contents will NOT be cleared
+ *            intentionally, so this function could be used to append data from multiple messages.
+ *            In that case, all messages must have the same fields.
+ *
+ * \return true on successful conversion, false on any error.
+ */
+bool fromROS(const sensor_msgs::PointCloud2& msg, mrpt::maps::CGenericPointsMap& obj);
+
+#endif
 
 /** Extract a list of fields found in the point cloud.
  * Typically: {"x","y","z","intensity"}
