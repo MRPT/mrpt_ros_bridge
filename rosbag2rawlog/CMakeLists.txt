@@ -25,6 +25,7 @@ find_package(catkin REQUIRED COMPONENTS
 # Find external dependencies
 find_package(CLI11 REQUIRED)
 find_package(mrpt-apps REQUIRED)
+find_package(mrpt-ros1bridge REQUIRED)
 
 # Define the catkin package
 catkin_package(
@@ -73,6 +74,7 @@ target_link_libraries(${PROJECT_NAME}
   CLI11::CLI11
   mrpt::apps
   mrpt::containers
+  mrpt::ros1bridge
 )
 
 # ===================================================================================================

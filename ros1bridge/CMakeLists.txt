@@ -55,7 +55,8 @@ add_library(${PROJECT_NAME} SHARED
 # Include directories
 target_include_directories(${PROJECT_NAME}
   PUBLIC
-    include
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
     ${catkin_INCLUDE_DIRS}
     ${mrpt-apps_INCLUDE_DIRS}
 )
@@ -69,6 +70,7 @@ target_link_libraries(${PROJECT_NAME}
 # Installation rules
 install(
   TARGETS ${PROJECT_NAME}
+  EXPORT ${PROJECT_NAME}Targets
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -77,6 +79,13 @@ install(
 install(
   DIRECTORY include/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+)
+
+# Export the targets to a CMake package
+install(EXPORT ${PROJECT_NAME}Targets
+  FILE ${PROJECT_NAME}Targets.cmake
+  NAMESPACE mrpt::
+  DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}/cmake/mrpt-ros1bridge
 )
 
 # === Tests ===

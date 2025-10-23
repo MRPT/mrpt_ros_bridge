@@ -1,8 +1,9 @@
 @PACKAGE_INIT@
 
-find_package(mrpt_libros_bridge REQUIRED)
+# Load the targets from the export
+include("${CMAKE_CURRENT_LIST_DIR}/mrpt_libros_bridgeTargets.cmake")
 
 # Provide an alias target so consumers can do: target_link_libraries(... mrpt::ros2bridge)
 if(NOT TARGET mrpt::ros1bridge)
-  add_library(mrpt::ros1bridge ALIAS mrpt_libros_bridge::mrpt_libros_bridge)
+  add_library(mrpt::ros1bridge ALIAS mrpt::mrpt_libros_bridge)
 endif()
