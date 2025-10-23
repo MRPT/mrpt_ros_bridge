@@ -16,8 +16,8 @@
 #include <mrpt/math/TPose2D.h>
 #include <mrpt/math/TPose3D.h>
 #include <mrpt/poses/poses_frwds.h>
-#include <tf2/LinearMath/Matrix3x3.hpp>
-#include <tf2/LinearMath/Transform.hpp>
+#include <tf2/LinearMath/Matrix3x3.h>
+#include <tf2/LinearMath/Transform.h>
 
 #include <cstring>  // size_t
 

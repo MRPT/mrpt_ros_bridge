@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>mrpt_libros_bridge</name>
+  <version>2.14.15</version>
+  <description>Mobile Robot Programming Toolkit (MRPT) ros1bridge C++ library</description>
+
+  <maintainer email="joseluisblancoc@gmail.com">Jose-Luis Blanco-Claraco</maintainer>
+  <license>BSD</license>
+
+  <url type="website">https://www.mrpt.org/</url>
+  <url type="bugtracker">https://github.com/MRPT/mrpt/issues</url>
+
+  <author email="joseluisblancoc@gmail.com">Jose-Luis Blanco-Claraco</author>
+
+  <!-- Build tool -->
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <!-- Build dependencies -->
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>nav_msgs</build_depend>
+  <build_depend>stereo_msgs</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>tf</build_depend>
+  <build_depend>tf2</build_depend>
+  <build_depend>tf2_geometry_msgs</build_depend>
+  <build_depend>cv_bridge</build_depend>
+  <build_depend>mrpt_libapps</build_depend>
+
+  <!-- Execution/runtime dependencies -->
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>stereo_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>tf</exec_depend>
+  <exec_depend>tf2</exec_depend>
+  <exec_depend>tf2_geometry_msgs</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>mrpt_libapps</exec_depend>
+
+  <!-- Documentation dependency -->
+  <doc_depend>doxygen</doc_depend>
+
+  <export>
+    <build_type>catkin</build_type>
+    <rosdoc config="doc/rosdoc.yaml" />
+  </export>
+</package>

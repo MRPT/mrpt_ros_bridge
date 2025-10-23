@@ -1,85 +1,162 @@
+cmake_minimum_required(VERSION 3.10)
+project(mrpt_libros_bridge)
 
-project(mrpt_ros1bridge LANGUAGES C CXX)
+# Use C++17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# MRPT CMake scripts: "mrpt_xxx()"
-find_package(mrpt_common REQUIRED)
+# Detect ROS 1 environment
+find_package(catkin REQUIRED COMPONENTS
+  geometry_msgs
+  sensor_msgs
+  nav_msgs
+  stereo_msgs
+  std_msgs
+  tf
+  tf2
+  tf2_geometry_msgs
+  cv_bridge
+)
 
+# Find MRPT dependency (from mrpt_libapps)
+find_package(mrpt-apps REQUIRED)
 
-# Additional dependencies for tests only:
-if (pcl_conversions_FOUND AND PCL_FOUND)
-  set_property(GLOBAL PROPERTY mrpt_ros1bridge_UNIT_TEST_EXTRA_DEPS ${pcl_conversions_LIBRARIES} ${PCL_COMMON_LIBRARIES})
-  set_property(GLOBAL PROPERTY mrpt_ros1bridge_UNIT_TEST_EXTRA_INCLUDE_DIRS ${pcl_conversions_INCLUDE_DIRS} ${PCL_COMMON_INCLUDE_DIRS})
-  set_property(GLOBAL PROPERTY mrpt_ros1bridge_UNIT_TEST_EXTRA_DEFINITIONS "HAVE_PCL_CONVERSIONS")
-endif()
+# Define catkin package
+catkin_package(
+  INCLUDE_DIRS include
+  LIBRARIES ${PROJECT_NAME}
+  CATKIN_DEPENDS
+    geometry_msgs
+    sensor_msgs
+    nav_msgs
+    stereo_msgs
+    std_msgs
+    tf
+    tf2
+    tf2_geometry_msgs
+    cv_bridge
+  #DEPENDS mrpt-apps
+)
 
-# define lib:
-set(LIB_SRCS
-  src/pose_unittest.cpp
-  src/stereo_image.cpp
+# Define the "lib${PROJECT_NAME}.so" shared library
+add_library(${PROJECT_NAME} SHARED
+  src/time.cpp
+  src/pose.cpp
   src/laser_scan.cpp
   src/map.cpp
-  src/time.cpp
-  src/time_unittest.cpp
   src/gps.cpp
-  src/imu.cpp
-  src/pose.cpp
-  src/map_unittest.cpp
-  src/image.cpp
-  src/point_cloud2.cpp
   src/range.cpp
-  src/pointcloud2_unittest.cpp
-  src/point_cloud.cpp
+  src/imu.cpp
+  src/point_cloud2.cpp
+  src/image.cpp
+  src/stereo_image.cpp
 )
 
-set(LIB_PUBLIC_HDRS
-  include/mrpt/ros1bridge
-  include/mrpt/ros1bridge/pose.h
-  include/mrpt/ros1bridge/time.h
-  include/mrpt/ros1bridge/range.h
-  include/mrpt/ros1bridge/stereo_image.h
-  include/mrpt/ros1bridge/map.h
-  include/mrpt/ros1bridge/gps.h
-  include/mrpt/ros1bridge/logging.h
-  include/mrpt/ros1bridge/point_cloud.h
-  include/mrpt/ros1bridge/imu.h
-  include/mrpt/ros1bridge/laser_scan.h
-  include/mrpt/ros1bridge/point_cloud2.h
-  include/mrpt/ros1bridge/image.h
-)
-
-mrpt_add_library(
-  TARGET ${PROJECT_NAME}
-  SOURCES ${LIB_SRCS} ${LIB_PUBLIC_HDRS}
-  PUBLIC_LINK_LIBRARIES
-   mrpt::maps
-   mrpt::obs
-#  PRIVATE_LINK_LIBRARIES
-#  CMAKE_DEPENDENCIES
-#   xxx
-)
-
-#target_link_libraries(${PROJECT_NAME} PRIVATE Threads::Threads) # for WorkerThreads
-
-# Add the required libraries for linking:
-target_link_libraries(${PROJECT_NAME}
-  PUBLIC
-  ${roscpp_LIBRARIES}
-  ${cv_bridge_LIBRARIES}
-)
-if (tf2_LIBRARIES)
-  target_link_libraries(${PROJECT_NAME} PUBLIC ${tf2_LIBRARIES})
-endif()
-if (TARGET tf2)
-  target_link_libraries(${PROJECT_NAME} PUBLIC tf2)
-endif()
-
+# Include directories
 target_include_directories(${PROJECT_NAME}
-  SYSTEM
   PUBLIC
-    ${tf2_INCLUDE_DIRS}
-  PRIVATE
-    ${cv_bridge_INCLUDE_DIRS}
+    include
+    ${catkin_INCLUDE_DIRS}
+    ${mrpt-apps_INCLUDE_DIRS}
 )
-target_compile_definitions(${PROJECT_NAME} PRIVATE ${ROS_DEFINITIONS})
-target_compile_definitions(${PROJECT_NAME} PRIVATE IS_MRPT_ROS1BRIDGE)
+
+# Link dependencies
+target_link_libraries(${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  mrpt::apps
+)
+
+# Installation rules
+install(
+  TARGETS ${PROJECT_NAME}
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+install(
+  DIRECTORY include/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+)
+
+# === Tests ===
+if(CATKIN_ENABLE_TESTING)
+  find_package(rostest REQUIRED)
+  catkin_add_gtest(test_${PROJECT_NAME}
+    src/map_unittest.cpp
+    src/pointcloud2_unittest.cpp
+    src/pose_unittest.cpp
+    src/time_unittest.cpp
+  )
+  if(TARGET test_${PROJECT_NAME})
+    target_link_libraries(test_${PROJECT_NAME}
+      ${PROJECT_NAME}
+      ${catkin_LIBRARIES}
+      gtest_main
+    )
+  endif()
+endif()
+
+# === MRPT version macros (unchanged) ===
+function(pad_string output str padchar length)
+  string(LENGTH "${str}" _strlen)
+  math(EXPR _strlen "${length} - ${_strlen}")
+  if(_strlen GREATER 0)
+    string(REPEAT ${padchar} ${_strlen} _pad)
+    string(PREPEND str ${_pad})
+  endif()
+  set(${output} "${str}" PARENT_SCOPE)
+endfunction()
+
+macro(mrpt_version_to_hex VER TARGET_VAR_NAME)
+  string(REGEX MATCHALL "[0-9]+" __parts "${${VER}}")
+  if(__parts)
+    list(GET __parts 0 __VERSION_NUMBER_MAJOR)
+    list(GET __parts 1 __VERSION_NUMBER_MINOR)
+    list(GET __parts 2 __VERSION_NUMBER_PATCH)
+    pad_string(__VERSION_NUMBER_MAJOR ${__VERSION_NUMBER_MAJOR} "0" 2)
+    pad_string(__VERSION_NUMBER_MINOR ${__VERSION_NUMBER_MINOR} "0" 2)
+    pad_string(__VERSION_NUMBER_PATCH ${__VERSION_NUMBER_PATCH} "0" 2)
+    set(${TARGET_VAR_NAME} "0x${__VERSION_NUMBER_MAJOR}${__VERSION_NUMBER_MINOR}${__VERSION_NUMBER_PATCH}")
+  else()
+    set(${TARGET_VAR_NAME} "0x000")
+  endif()
+endmacro()
+
+# Convert package versions to hex so they can be used in preprocessor
+mrpt_version_to_hex(cv_bridge_VERSION cv_bridge_VERSION_HEX)
 target_compile_definitions(${PROJECT_NAME} PRIVATE CV_BRIDGE_VERSION=${cv_bridge_VERSION_HEX})
+
+# === Export a standard CMake config file (like ROS 2 ament does) ===
+include(CMakePackageConfigHelpers)
+
+# Create an alias target for compatibility
+add_library(mrpt::ros1bridge ALIAS ${PROJECT_NAME})
+
+# Extract version number from package.xml
+file(READ ${CMAKE_SOURCE_DIR}/package.xml contentPackageXML)
+string(REGEX MATCH "<version>([0-9\.]*)</version>" _ ${contentPackageXML})
+set(MRPT_ROS1BRIDGE_VERSION ${CMAKE_MATCH_1})
+message(STATUS "MRPT_ROS1BRIDGE_VERSION: ${MRPT_ROS1BRIDGE_VERSION}")
+
+# Generate the config file
+configure_package_config_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/mrpt-ros1bridge-config.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/mrpt-ros1bridge-config.cmake"
+  INSTALL_DESTINATION "${CATKIN_PACKAGE_LIB_DESTINATION}/cmake/mrpt-ros1bridge"
+)
+
+# Generate version file
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/mrpt-ros1bridge-config-version.cmake"
+  VERSION ${MRPT_ROS1BRIDGE_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+
+# Install both config + version files
+install(
+  FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/mrpt-ros1bridge-config.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/mrpt-ros1bridge-config-version.cmake"
+  DESTINATION "${CATKIN_PACKAGE_LIB_DESTINATION}/cmake/mrpt-ros1bridge"
+)
