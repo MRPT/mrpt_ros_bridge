@@ -21,9 +21,6 @@ find_package(cv_bridge REQUIRED)
 # Find MRPT dependency (from mrpt_libapps)
 find_package(mrpt-apps REQUIRED)
 
-# find GTest and ament_cmake_gtest
-find_package(ament_cmake_gtest REQUIRED)
-
 # Define the "lib${PROJECT_NAME}.so" shared library
 add_library(${PROJECT_NAME} SHARED
   src/time.cpp
@@ -91,6 +88,9 @@ ament_export_dependencies(
 
 # Unit tests
 if(BUILD_TESTING)
+  # find GTest and ament_cmake_gtest
+  find_package(ament_cmake_gtest REQUIRED)
+
   ament_add_gtest(test_${PROJECT_NAME}
     src/map_unittest.cpp
     src/pointcloud2_unittest.cpp
