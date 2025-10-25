@@ -12,7 +12,6 @@ find_package(catkin REQUIRED COMPONENTS
   nav_msgs
   stereo_msgs
   std_msgs
-  tf
   tf2
   tf2_geometry_msgs
   cv_bridge
@@ -31,7 +30,6 @@ catkin_package(
     nav_msgs
     stereo_msgs
     std_msgs
-    tf
     tf2
     tf2_geometry_msgs
     cv_bridge
