@@ -16,13 +16,12 @@
 
   <!-- Build dependencies -->
   <depend>roscpp</depend>
-  <depend>tf2</depend>
+  <depend>tf</depend>
   <depend>geometry_msgs</depend>
   <depend>std_msgs</depend>
 
   <build_depend>cli11</build_depend>
   <build_depend>cv_bridge</build_depend>
-  <build_depend>mrpt_libapps</build_depend>
   <build_depend>mrpt_libros_bridge</build_depend>
   <build_depend>mrpt_msgs</build_depend>
   <build_depend>nav_msgs</build_depend>
