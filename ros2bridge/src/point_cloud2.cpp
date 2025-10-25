@@ -862,7 +862,10 @@ bool mrpt::ros2bridge::fromROS(
     check_field(msg.fields[i], "intensity", &i_field);
   }
 
-  if (incompatible || (!x_field || !y_field || !z_field || !ring_field)) return false;
+  if (incompatible || (!x_field || !y_field || !z_field || !ring_field))
+  {
+    return false;
+  }
 
   // 1st: go through the scan and find ring count:
   uint16_t ring_min = 0, ring_max = 0;
