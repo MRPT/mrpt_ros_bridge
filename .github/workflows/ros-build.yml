@@ -31,13 +31,13 @@ jobs:
 
       - name: Setup rosdep
         run: |
-          rosdep init || true
-          rosdep update
+          rosdep init --rosdistro=noetic || true
+          rosdep update --rosdistro=noetic
 
       - name: Install package dependencies
         run: |
           . /opt/ros/${{ matrix.ros_distribution }}/setup.sh
-          rosdep install --from-paths . --ignore-src -r -y
+          rosdep install --rosdistro=noetic --from-paths . --ignore-src -r -y
 
       - name: Build with colcon
         run: |
