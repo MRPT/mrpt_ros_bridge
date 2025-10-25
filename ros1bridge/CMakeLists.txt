@@ -20,6 +20,10 @@ find_package(catkin REQUIRED COMPONENTS
 # Find MRPT dependency (from mrpt_libapps)
 find_package(mrpt-apps REQUIRED)
 
+# Define compatibility variables for Catkin (to silence warnings)
+set(mrpt-apps_INCLUDE_DIRS "")
+set(mrpt-apps_LIBRARIES mrpt::apps)
+
 # Tell catkin about MRPT include and library dirs
 set(MRPT_APPS_INCLUDE_DIRS ${mrpt-apps_INCLUDE_DIRS})
 set(MRPT_APPS_LIBRARIES mrpt::apps)
