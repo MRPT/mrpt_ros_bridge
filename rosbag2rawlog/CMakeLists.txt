@@ -72,7 +72,6 @@ target_include_directories(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
   CLI11::CLI11
-  mrpt::apps
   mrpt::containers
   mrpt::ros1bridge
 )

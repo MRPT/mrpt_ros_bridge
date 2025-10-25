@@ -265,7 +265,7 @@ Obs toPointCloud2(
     auto mrptPts = mrpt::maps::CGenericPointsMap::Create();
     ptsObs->pointcloud = mrptPts;
 
-    if (!mrpt::ros1bridge::fromROS(pts, *mrptPts))
+    if (!mrpt::ros1bridge::fromROS(*pts, *mrptPts))
     {
       THROW_EXCEPTION("Could not convert pointcloud from ROS to CGenericPointsMap");
     }
