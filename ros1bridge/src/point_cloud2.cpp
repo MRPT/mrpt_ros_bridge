@@ -50,12 +50,18 @@ void get_float_from_field(
   if (field != nullptr)
   {
     if (field->datatype == sensor_msgs::PointField::FLOAT32)
+    {
       output = *(reinterpret_cast<const float*>(&data[field->offset]));
+    }
     else
+    {
       output = (float)(*(reinterpret_cast<const double*>(&data[field->offset])));
+    }
   }
   else
+  {
     output = 0.0;
+  }
 }
 
 void get_double_from_field(
@@ -144,7 +150,10 @@ bool mrpt::ros1bridge::fromROS(const sensor_msgs::PointCloud2& msg, CSimplePoint
     incompatible |= check_field(msg.fields[i], "z", &z_field);
   }
 
-  if (incompatible || (!x_field || !y_field || !z_field)) return false;
+  if (incompatible || (!x_field || !y_field || !z_field))
+  {
+    return false;
+  }
 
   // If not, memcpy each group of contiguous fields separately
   for (std::size_t row = 0; row < msg.height; ++row)
@@ -291,7 +300,7 @@ bool mrpt::ros1bridge::fromROS(const sensor_msgs::PointCloud2& msg, CPointsMapXY
           // I only found one case (NTU Viral dataset) using uint32_t for time,
           // and times ranged from 0 to ~99822766 = 100,000,000 = 1e8
           // so they seem to be nanoseconds:
-          obj.setPointTime(idx, t * 1e-9);
+          obj.setPointTime(idx, static_cast<float>(t) * 1e-9f);
         }
 
         const float t = obj.getPointTime(idx);
@@ -641,7 +650,7 @@ bool mrpt::ros1bridge::toROS(
   msg.row_step = msg.width * msg.point_step;
 
   // data:
-  msg.data.resize(msg.row_step * msg.height);
+  msg.data.resize(static_cast<std::size_t>(msg.row_step) * msg.height);
 
   const auto& xs = obj.getPointsBufferRef_x();
   const auto& ys = obj.getPointsBufferRef_y();
@@ -958,7 +967,10 @@ bool mrpt::ros1bridge::fromROS(
         obj.intensityImage(ring_id, az_idx) = lround(255 * intensity / max_intensity);
       }
 
-      if (inputCloudIsOrganized) obj.organizedPoints(ring_id, az_idx) = localPt;
+      if (inputCloudIsOrganized)
+      {
+        obj.organizedPoints(ring_id, az_idx) = localPt;
+      }
     }
   }
 
