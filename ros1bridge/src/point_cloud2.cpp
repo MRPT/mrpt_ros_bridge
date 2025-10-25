@@ -147,10 +147,10 @@ bool mrpt::ros1bridge::fromROS(const sensor_msgs::PointCloud2& msg, CSimplePoint
   if (incompatible || (!x_field || !y_field || !z_field)) return false;
 
   // If not, memcpy each group of contiguous fields separately
-  for (unsigned int row = 0; row < msg.height; ++row)
+  for (std::size_t row = 0; row < msg.height; ++row)
   {
     const unsigned char* row_data = &msg.data[row * msg.row_step];
-    for (uint32_t col = 0; col < msg.width; ++col)
+    for (std::size_t col = 0; col < msg.width; ++col)
     {
       const unsigned char* msg_data = row_data + col * msg.point_step;
 
@@ -189,10 +189,15 @@ bool mrpt::ros1bridge::fromROS(const sensor_msgs::PointCloud2& msg, CPointsMapXY
     return false;
   }
 
-  for (unsigned int row = 0; row < msg.height; ++row)
+#if MRPT_VERSION >= 0x20f00  // 2.15.0
+  auto* Is = obj.getPointsBufferRef_float_field(CPointsMapXYZI::POINT_FIELD_INTENSITY);
+  ASSERT_(Is);
+#endif
+
+  for (std::size_t row = 0; row < msg.height; ++row)
   {
     const unsigned char* row_data = &msg.data[row * msg.row_step];
-    for (uint32_t col = 0; col < msg.width; ++col)
+    for (std::size_t col = 0; col < msg.width; ++col)
     {
       const unsigned char* msg_data = row_data + col * msg.point_step;
 
@@ -202,7 +207,11 @@ bool mrpt::ros1bridge::fromROS(const sensor_msgs::PointCloud2& msg, CPointsMapXY
       get_float_from_field(z_field, msg_data, z);
       get_float_from_field(i_field, msg_data, i);
       obj.insertPoint(x, y, z);
+#if MRPT_VERSION >= 0x20f00  // 2.15.0
+      Is->push_back(i);
+#else
       obj.insertPointField_Intensity(i);
+#endif
     }
   }
   return true;
@@ -240,10 +249,10 @@ bool mrpt::ros1bridge::fromROS(const sensor_msgs::PointCloud2& msg, CPointsMapXY
   std::optional<float> minTime, maxTime;
 
   unsigned int idx = 0;
-  for (unsigned int row = 0; row < msg.height; ++row)
+  for (std::size_t row = 0; row < msg.height; ++row)
   {
     const unsigned char* row_data = &msg.data[row * msg.row_step];
-    for (uint32_t col = 0; col < msg.width; ++col, ++idx)
+    for (std::size_t col = 0; col < msg.width; ++col, ++idx)
     {
       const unsigned char* msg_data = row_data + col * msg.point_step;
 
@@ -383,10 +392,10 @@ bool mrpt::ros1bridge::fromROS(
 
   unsigned int idx = 0;
   std::optional<double> baseTimeStamp;
-  for (unsigned int row = 0; row < msg.height; ++row)
+  for (std::size_t row = 0; row < msg.height; ++row)
   {
     const unsigned char* row_data = &msg.data[static_cast<std::size_t>(row) * msg.row_step];
-    for (uint32_t col = 0; col < msg.width; ++col, ++idx)
+    for (std::size_t col = 0; col < msg.width; ++col, ++idx)
     {
       const unsigned char* msg_data = row_data + static_cast<std::size_t>(col) * msg.point_step;
 
@@ -449,6 +458,153 @@ bool mrpt::ros1bridge::fromROS(
   }
   return true;
 }
+
+bool mrpt::ros1bridge::toROS(
+    const mrpt::maps::CGenericPointsMap& obj,
+    const std_msgs::Header& msg_header,
+    sensor_msgs::PointCloud2& msg)
+{
+  //
+  {
+    msg.header = msg_header;
+
+    // 2D structure of the point cloud. If the cloud is unordered, height is
+    //  1 and width is the length of the point cloud.
+    msg.height = 1;
+    msg.width = obj.size();
+
+    // Basic XYZ fields:
+    std::vector<std::string> names = {"x", "y", "z"};
+    std::vector<size_t> offsets = {0, sizeof(float) * 1, sizeof(float) * 2};
+    size_t point_step = sizeof(float) * 3;
+
+    // Gather additional registered fields in the generic map:
+    // Float fields (including "t" if present) and unsigned integer fields (uint16)
+    std::vector<std::string_view> float_fields;
+    std::vector<std::string_view> uint16_fields;
+
+    // The following two calls assume CGenericPointsMap exposes methods to list
+    // registered fields. Adjust these method names to the actual API if needed.
+    float_fields = obj.getPointFieldNames_float();
+    uint16_fields = obj.getPointFieldNames_uint16();
+
+    // Remove x,y,z from the registered lists if present:
+    auto remove_name = [](std::vector<std::string_view>& vec, const std::string& n)
+    { vec.erase(std::remove(vec.begin(), vec.end(), n), vec.end()); };
+    remove_name(float_fields, "x");
+    remove_name(float_fields, "y");
+    remove_name(float_fields, "z");
+    remove_name(uint16_fields, "x");
+    remove_name(uint16_fields, "y");
+    remove_name(uint16_fields, "z");
+
+    // Append float fields
+    for (const auto& fn : float_fields)
+    {
+      names.push_back(std::string(fn));
+      offsets.push_back(point_step);
+      point_step += sizeof(float);
+    }
+
+    // Append uint16 fields
+    for (const auto& un : uint16_fields)
+    {
+      names.push_back(std::string(un));
+      offsets.push_back(point_step);
+      point_step += sizeof(uint16_t);
+    }
+
+    // Build msg.fields
+    msg.fields.resize(names.size());
+    for (size_t i = 0; i < names.size(); ++i)
+    {
+      auto& f = msg.fields[i];
+      f.count = 1;
+      f.offset = static_cast<uint32_t>(offsets[i]);
+      // ring-like uint16 fields:
+      if (std::find(uint16_fields.begin(), uint16_fields.end(), names[i]) != uint16_fields.end())
+      {
+        f.datatype = sensor_msgs::PointField::UINT16;
+      }
+      else
+      {
+        f.datatype = sensor_msgs::PointField::FLOAT32;
+      }
+      f.name = names[i];
+    }
+
+#if MRPT_IS_BIG_ENDIAN
+    msg.is_bigendian = true;
+#else
+    msg.is_bigendian = false;
+#endif
+
+    msg.point_step = static_cast<uint32_t>(point_step);
+    msg.row_step = msg.width * msg.point_step;
+
+    // Resize data buffer
+    msg.data.resize(static_cast<std::size_t>(msg.row_step) * msg.height);
+
+    // Access base point coordinate buffers:
+    const auto& xs = obj.getPointsBufferRef_x();
+    const auto& ys = obj.getPointsBufferRef_y();
+    const auto& zs = obj.getPointsBufferRef_z();
+    const size_t N = xs.size();
+    ASSERT_EQUAL_(ys.size(), N);
+    ASSERT_EQUAL_(zs.size(), N);
+    ASSERT_EQUAL_(msg.width, N);
+
+    // Prepare pointers to additional fields buffers:
+    std::map<std::string_view, const mrpt::aligned_std_vector<float>*> float_bufs;
+    std::map<std::string_view, const mrpt::aligned_std_vector<uint16_t>*> uint16_bufs;
+
+    for (const auto& fn : float_fields)
+    {
+      const auto* v = obj.getPointsBufferRef_float_field(fn);
+      ASSERT_(v);
+      ASSERT_EQUAL_(v->size(), N);
+      float_bufs[fn] = v;
+    }
+    for (const auto& un : uint16_fields)
+    {
+      const auto* v = obj.getPointsBufferRef_uint_field(un);
+      ASSERT_(v);
+      ASSERT_EQUAL_(v->size(), N);
+      uint16_bufs[un] = v;
+    }
+
+    // Fill data per point
+    uint8_t* dst = msg.data.data();
+    for (size_t i = 0; i < N; ++i)
+    {
+      // x,y,z
+      memcpy(dst + offsets[0], &xs[i], sizeof(float));
+      memcpy(dst + offsets[1], &ys[i], sizeof(float));
+      memcpy(dst + offsets[2], &zs[i], sizeof(float));
+
+      // float fields
+      for (size_t fi = 0; fi < float_fields.size(); ++fi)
+      {
+        const auto& name = float_fields[fi];
+        const auto* buf = float_bufs[name];
+        memcpy(dst + offsets[3 + fi], &(*buf)[i], sizeof(float));
+      }
+
+      // uint16 fields
+      for (size_t ui = 0; ui < uint16_fields.size(); ++ui)
+      {
+        const auto& name = uint16_fields[ui];
+        const auto* buf = uint16_bufs[name];
+        memcpy(dst + offsets[3 + float_fields.size() + ui], &(*buf)[i], sizeof(uint16_t));
+      }
+
+      dst += msg.point_step;
+    }
+
+    return true;
+  }
+}
+
 #endif
 
 bool mrpt::ros1bridge::toROS(
@@ -536,12 +692,18 @@ bool mrpt::ros1bridge::toROS(
   msg.row_step = msg.width * msg.point_step;
 
   // data:
-  msg.data.resize(msg.row_step * msg.height);
+  msg.data.resize(static_cast<std::size_t>(msg.row_step) * msg.height);
 
   const auto& xs = obj.getPointsBufferRef_x();
   const auto& ys = obj.getPointsBufferRef_y();
   const auto& zs = obj.getPointsBufferRef_z();
+#if MRPT_VERSION >= 0x20f00  // 2.15.0
+  const auto* Is = obj.getPointsBufferRef_float_field(CPointsMapXYZI::POINT_FIELD_INTENSITY);
+#else
   const auto* Is = obj.getPointsBufferRef_intensity();
+#endif
+  ASSERT_(Is);
+  ASSERT_EQUAL_(Is->size(), xs.size());
 
   float* pointDest = reinterpret_cast<float*>(msg.data.data());
   for (size_t i = 0; i < xs.size(); i++)
@@ -570,23 +732,36 @@ bool mrpt::ros1bridge::toROS(
 
   msg.point_step = sizeof(float) * 3;
 
+#if MRPT_VERSION >= 0x20f00  // 2.15.0
+  const auto* Is = obj.getPointsBufferRef_float_field(CPointsMapXYZIRT::POINT_FIELD_INTENSITY);
+  const auto* Rs = obj.getPointsBufferRef_uint_field(CPointsMapXYZIRT::POINT_FIELD_RING_ID);
+  const auto* Ts = obj.getPointsBufferRef_float_field(CPointsMapXYZIRT::POINT_FIELD_TIMESTAMP);
+#else
+  const auto* Is = obj.getPointsBufferRef_intensity();
+  const auto* Rs = obj.getPointsBufferRef_ring();
+  const auto* Ts = obj.getPointsBufferRef_timestamp();
+#endif
+
   if (obj.hasIntensityField())
   {
-    ASSERT_EQUAL_(obj.getPointsBufferRef_intensity()->size(), obj.size());
+    ASSERT_(Is);
+    ASSERT_EQUAL_(Is->size(), obj.size());
     names.push_back("intensity");
     offsets.push_back(msg.point_step);
     msg.point_step += sizeof(float);
   }
   if (obj.hasTimeField())
   {
-    ASSERT_EQUAL_(obj.getPointsBufferRef_timestamp()->size(), obj.size());
+    ASSERT_(Ts);
+    ASSERT_EQUAL_(Ts->size(), obj.size());
     names.push_back("time");
     offsets.push_back(msg.point_step);
     msg.point_step += sizeof(float);
   }
   if (obj.hasRingField())
   {
-    ASSERT_EQUAL_(obj.getPointsBufferRef_ring()->size(), obj.size());
+    ASSERT_(Rs);
+    ASSERT_EQUAL_(Rs->size(), obj.size());
     names.push_back("ring");
     offsets.push_back(msg.point_step);
     msg.point_step += sizeof(uint16_t);
@@ -613,14 +788,11 @@ bool mrpt::ros1bridge::toROS(
   msg.row_step = msg.width * msg.point_step;
 
   // data:
-  msg.data.resize(msg.row_step * msg.height);
+  msg.data.resize(static_cast<std::size_t>(msg.row_step) * msg.height);
 
   const auto& xs = obj.getPointsBufferRef_x();
   const auto& ys = obj.getPointsBufferRef_y();
   const auto& zs = obj.getPointsBufferRef_z();
-  const auto& Is = *obj.getPointsBufferRef_intensity();
-  const auto& Rs = *obj.getPointsBufferRef_ring();
-  const auto& Ts = *obj.getPointsBufferRef_timestamp();
 
   uint8_t* pointDest = msg.data.data();
   for (size_t i = 0; i < xs.size(); i++)
@@ -630,12 +802,20 @@ bool mrpt::ros1bridge::toROS(
     memcpy(pointDest + offsets[f++], &ys[i], sizeof(float));
     memcpy(pointDest + offsets[f++], &zs[i], sizeof(float));
 
-    if (obj.hasIntensityField()) memcpy(pointDest + offsets[f++], &Is[i], sizeof(float));
+    if (obj.hasIntensityField())
+    {
+      memcpy(pointDest + offsets[f++], &(*Is)[i], sizeof(float));
+    }
 
-    if (obj.hasTimeField()) memcpy(pointDest + offsets[f++], &Ts[i], sizeof(float));
+    if (obj.hasTimeField())
+    {
+      memcpy(pointDest + offsets[f++], &(*Ts)[i], sizeof(float));
+    }
 
-    if (obj.hasRingField()) memcpy(pointDest + offsets[f++], &Rs[i], sizeof(uint16_t));
-
+    if (obj.hasRingField())
+    {
+      memcpy(pointDest + offsets[f++], &(*Rs)[i], sizeof(uint16_t));
+    }
     pointDest += msg.point_step;
   }
 
@@ -666,15 +846,18 @@ bool mrpt::ros1bridge::fromROS(
     check_field(msg.fields[i], "intensity", &i_field);
   }
 
-  if (incompatible || (!x_field || !y_field || !z_field || !ring_field)) return false;
+  if (incompatible || (!x_field || !y_field || !z_field || !ring_field))
+  {
+    return false;
+  }
 
   // 1st: go through the scan and find ring count:
   uint16_t ring_min = 0, ring_max = 0;
 
-  for (unsigned int row = 0; row < msg.height; ++row)
+  for (std::size_t row = 0; row < msg.height; ++row)
   {
     const unsigned char* row_data = &msg.data[row * msg.row_step];
-    for (uint32_t col = 0; col < msg.width; ++col)
+    for (std::size_t col = 0; col < msg.width; ++col)
     {
       const unsigned char* msg_data = row_data + col * msg.point_step;
       uint16_t ring_id = 0;
@@ -713,7 +896,10 @@ bool mrpt::ros1bridge::fromROS(
   obj.sensorPose = sensorPoseOnRobot;
 
   // Default unit: 1cm
-  if (obj.rangeResolution == 0) obj.rangeResolution = 1e-2;
+  if (obj.rangeResolution == 0)
+  {
+    obj.rangeResolution = 1e-2;
+  }
 
   if (i_field)
   {
@@ -721,7 +907,9 @@ bool mrpt::ros1bridge::fromROS(
     obj.intensityImage.fill(0);
   }
   else
+  {
     obj.intensityImage.resize(0, 0);
+  }
 
   if (inputCloudIsOrganized)
   {
@@ -729,10 +917,10 @@ bool mrpt::ros1bridge::fromROS(
   }
 
   // If not, memcpy each group of contiguous fields separately
-  for (unsigned int row = 0; row < msg.height; ++row)
+  for (std::size_t row = 0; row < msg.height; ++row)
   {
     const unsigned char* row_data = &msg.data[row * msg.row_step];
-    for (uint32_t col = 0; col < msg.width; ++col)
+    for (std::size_t col = 0; col < msg.width; ++col)
     {
       const unsigned char* msg_data = row_data + col * msg.point_step;
 

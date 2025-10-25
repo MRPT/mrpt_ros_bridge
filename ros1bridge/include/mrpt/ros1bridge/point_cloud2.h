@@ -118,6 +118,18 @@ bool toROS(
     const std_msgs::Header& msg_header,
     sensor_msgs::PointCloud2& msg);
 
+#if MRPT_VERSION >= 0x20f00  // 2.15.0
+
+/** Convert mrpt::maps::CGenericPointsMap with arbitrary per-point-fields to sensor_msgs/PointCloud2
+ * \return true on successful conversion, false on any error.
+ */
+bool toROS(
+    const mrpt::maps::CGenericPointsMap& obj,
+    const std_msgs::Header& msg_header,
+    sensor_msgs::PointCloud2& msg);
+
+#endif
+
 /** @} */
 /** @} */
 
