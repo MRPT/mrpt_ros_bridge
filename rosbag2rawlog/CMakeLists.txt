@@ -46,7 +46,8 @@ target_link_libraries(
   tf2_msgs::tf2_msgs__rosidl_typesupport_cpp
   cv_bridge::cv_bridge
   tf2_geometry_msgs::tf2_geometry_msgs
-  mrpt_msgs::mrpt_msgs_library
+  #mrpt_msgs::mrpt_msgs_library  # Change when mrpt_msgs >=0.6.0 is released
+  mrpt_msgs::mrpt_msgs__rosidl_typesupport_cpp
 )
 
 
