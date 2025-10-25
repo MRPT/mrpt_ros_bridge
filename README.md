@@ -1,6 +1,6 @@
 # mrpt_ros_bridge
 
-[![CI Build colcon](https://github.com/MRPT/mrpt_ros_bridge/actions/workflows/build-ros1.yml/badge.svg)](https://github.com/MRPT/mrpt_ros_bridge/actions/workflows/build-ros1.yml)
+[![CI Build colcon (ROS1 Noetic)](https://github.com/MRPT/mrpt_ros_bridge/actions/workflows/ros1-build.yml/badge.svg)](https://github.com/MRPT/mrpt_ros_bridge/actions/workflows/ros1-build.yml)
 
 ROS 1 package providing a **C++ bridge between MRPT (Mobile Robot Programming Toolkit)** and the ROS ecosystem.
 It enables seamless conversion between MRPT and ROS message types for maps, sensor data, poses, images, and more.
