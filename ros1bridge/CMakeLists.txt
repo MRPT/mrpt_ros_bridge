@@ -20,10 +20,16 @@ find_package(catkin REQUIRED COMPONENTS
 # Find MRPT dependency (from mrpt_libapps)
 find_package(mrpt-apps REQUIRED)
 
+# Tell catkin about MRPT include and library dirs
+set(MRPT_APPS_INCLUDE_DIRS ${mrpt-apps_INCLUDE_DIRS})
+set(MRPT_APPS_LIBRARIES mrpt::apps)
+
 # Define catkin package
 catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES ${PROJECT_NAME}
+  INCLUDE_DIRS
+    include
+    ${MRPT_APPS_INCLUDE_DIRS}
+  LIBRARIES ${PROJECT_NAME} ${MRPT_APPS_LIBRARIES}
   CATKIN_DEPENDS
     geometry_msgs
     sensor_msgs
@@ -33,7 +39,8 @@ catkin_package(
     tf2
     tf2_geometry_msgs
     cv_bridge
-  #DEPENDS mrpt-apps
+  DEPENDS
+    mrpt-apps
 )
 
 # Define the "lib${PROJECT_NAME}.so" shared library
