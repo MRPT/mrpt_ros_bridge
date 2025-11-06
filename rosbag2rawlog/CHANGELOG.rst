@@ -2,8 +2,8 @@
 Changelog for package rosbag2rawlog
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
-----------------------
+3.0.0 (2025-11-07)
+------------------
 * Release as independent repository. Moved out from the mrpt_navigation repository.
 
 

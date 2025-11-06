@@ -2,8 +2,8 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
-----------------------
+3.0.0 (2025-11-07)
+------------------
 * Release as independent repository. Moved out from the MRPT/mrpt repository.
 
 
