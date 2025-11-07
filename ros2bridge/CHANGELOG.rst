@@ -2,8 +2,8 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+3.0.1 (2025-11-07)
+------------------
 * Fix package.xml so packages downstream install the required dependencies
 * Finer grained dependencies on the part of mrpt that is really used
 * Contributors: Jose Luis Blanco-Claraco
