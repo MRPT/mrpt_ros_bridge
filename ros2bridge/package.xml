@@ -21,22 +21,16 @@
   <!-- COMMON DEPS: This ensures we have ROS_DISTRO, etc. env vars -->
   <build_depend>ros_environment</build_depend>
 
-  <!-- Deps required by building only -->
+  <build_depend>ament_cmake</build_depend>
 
-  <!-- Required for cmake scripts to find ament_cmake and then realize we are in ROS 2, not ROS 1 -->
-  <build_depend condition="$ROS_VERSION == 2">ament_cmake</build_depend>
-
-  <!-- for rosbag2rawlog (ROS 1 only, ROS 2 version lives in the mrpt_libnavigation repository) -->
-  <build_depend>tf2_geometry_msgs</build_depend>
-
-  <!-- Deps for cmake to realize we have ROS1 -->
-  <build_depend>cv_bridge</build_depend>
-  <build_depend>nav_msgs</build_depend>
-  <build_depend>sensor_msgs</build_depend>
-  <build_depend>geometry_msgs</build_depend>
-  <build_depend>std_msgs</build_depend>
-  <build_depend>stereo_msgs</build_depend>
-  <build_depend>tf2</build_depend>
+  <depend>cv_bridge</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>stereo_msgs</depend>
+  <depend>tf2_geometry_msgs</depend>
+  <depend>tf2</depend>
 
   <doc_depend>doxygen</doc_depend>
 
@@ -46,7 +40,6 @@
   <buildtool_depend>cmake</buildtool_depend>
   <export>
     <build_type>cmake</build_type>
-    <rosdoc config="doc/rosdoc.yaml" />
   </export>
   <!-- End -->
 

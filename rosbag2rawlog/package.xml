@@ -17,7 +17,7 @@
   <!-- DEPS -->
   <depend>cli11</depend>
   <depend>cv_bridge</depend>
-  <depend>mrpt_libapps</depend>
+  <depend>mrpt_libmaps</depend>
   <depend>mrpt_libros_bridge</depend>
   <depend>mrpt_msgs</depend>
   <depend>nav_msgs</depend>

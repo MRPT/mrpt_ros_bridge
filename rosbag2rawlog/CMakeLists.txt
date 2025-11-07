@@ -13,7 +13,7 @@ find_package(cv_bridge REQUIRED)
 find_package(mrpt_msgs REQUIRED)
 
 find_package(mrpt_libros_bridge REQUIRED)
-find_package(mrpt-apps REQUIRED)
+find_package(mrpt-maps REQUIRED)
 message(STATUS "MRPT_VERSION: ${MRPT_VERSION}")
 
 if (CMAKE_COMPILER_IS_GNUCXX)
@@ -36,7 +36,7 @@ target_link_libraries(
   ${PROJECT_NAME}
   mrpt_libros_bridge::mrpt_libros_bridge
   CLI11::CLI11
-  mrpt::apps
+  mrpt::maps
   mrpt::containers
   rclcpp::rclcpp
   tf2::tf2

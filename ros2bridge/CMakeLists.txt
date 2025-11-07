@@ -18,8 +18,8 @@ find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 
-# Find MRPT dependency (from mrpt_libapps)
-find_package(mrpt-apps REQUIRED)
+# Find MRPT dependency (from mrpt_libmaps)
+find_package(mrpt-maps REQUIRED)
 
 # Define the "lib${PROJECT_NAME}.so" shared library
 add_library(${PROJECT_NAME} SHARED
@@ -49,7 +49,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
   #tf2_msgs::tf2_msgs__rosidl_typesupport_cpp
   cv_bridge::cv_bridge
   geometry_msgs::geometry_msgs__rosidl_typesupport_cpp
-  mrpt::apps
+  mrpt::maps
   nav_msgs::nav_msgs__rosidl_typesupport_cpp
   sensor_msgs::sensor_msgs_library
   std_msgs::std_msgs__rosidl_typesupport_cpp
@@ -83,7 +83,7 @@ ament_export_dependencies(
   tf2
   tf2_geometry_msgs
   cv_bridge
-  mrpt-apps
+  mrpt-maps
 )
 
 # Unit tests
