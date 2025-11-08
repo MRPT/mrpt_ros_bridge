@@ -2,6 +2,11 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* FIX: Wrong find_dependency() on mrpt-apps, while it should be now mrpt-maps for minimal dependencies
+* Contributors: Jose Luis Blanco-Claraco
+
 3.0.1 (2025-11-07)
 ------------------
 * Fix package.xml so packages downstream install the required dependencies
