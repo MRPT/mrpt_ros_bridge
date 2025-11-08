@@ -7,7 +7,8 @@ if(NOT TARGET mrpt::ros2bridge)
   add_library(mrpt::ros2bridge ALIAS mrpt_libros_bridge::mrpt_libros_bridge)
 endif()
 
-# Make sure mrpt-apps is also found:
+# Make sure mrpt-maps mrpt-obs are also found:
 include(CMakeFindDependencyMacro)
 
-find_dependency(mrpt-apps REQUIRED)
+find_dependency(mrpt-maps REQUIRED)
+find_dependency(mrpt-obs REQUIRED)
