@@ -2,6 +2,11 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* PointCloud2 to CGenericPointsMap: parse remaining fields of unsupported types as float
+* Contributors: Jose Luis Blanco-Claraco
+
 3.0.2 (2025-11-08)
 ------------------
 * FIX: Wrong find_dependency() on mrpt-apps, while it should be now mrpt-maps for minimal dependencies
