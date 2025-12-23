@@ -49,6 +49,8 @@ bool check_field(
   return coherence_error;
 }
 
+// This will be used as a wildcard for all other field types not directly supported by
+// CGenericPointsMap
 void get_float_from_field(
     const sensor_msgs::msg::PointField* field, const unsigned char* data, float& output)
 {
@@ -61,6 +63,22 @@ void get_float_from_field(
     else if (field->datatype == sensor_msgs::msg::PointField::FLOAT64)
     {
       output = static_cast<float>(*(reinterpret_cast<const double*>(&data[field->offset])));
+    }
+    else if (field->datatype == sensor_msgs::msg::PointField::UINT32)
+    {
+      output = static_cast<float>(*(reinterpret_cast<const uint32_t*>(&data[field->offset])));
+    }
+    else if (field->datatype == sensor_msgs::msg::PointField::INT8)
+    {
+      output = static_cast<float>(*(reinterpret_cast<const int8_t*>(&data[field->offset])));
+    }
+    else if (field->datatype == sensor_msgs::msg::PointField::INT16)
+    {
+      output = static_cast<float>(*(reinterpret_cast<const int16_t*>(&data[field->offset])));
+    }
+    else if (field->datatype == sensor_msgs::msg::PointField::INT32)
+    {
+      output = static_cast<float>(*(reinterpret_cast<const int32_t*>(&data[field->offset])));
     }
   }
   else
@@ -89,6 +107,22 @@ void get_double_from_field(
   }
 }
 
+void get_uint8_from_field(
+    const sensor_msgs::msg::PointField* field, const unsigned char* data, uint8_t& output)
+{
+  if (field != nullptr)
+  {
+    if (field->datatype == sensor_msgs::msg::PointField::UINT8)
+    {
+      output = *(reinterpret_cast<const uint8_t*>(&data[field->offset]));
+    }
+  }
+  else
+  {
+    output = 0;
+  }
+}
+
 void get_uint16_from_field(
     const sensor_msgs::msg::PointField* field, const unsigned char* data, uint16_t& output)
 {
@@ -97,10 +131,6 @@ void get_uint16_from_field(
     if (field->datatype == sensor_msgs::msg::PointField::UINT16)
     {
       output = *(reinterpret_cast<const uint16_t*>(&data[field->offset]));
-    }
-    else if (field->datatype == sensor_msgs::msg::PointField::UINT8)
-    {
-      output = *(reinterpret_cast<const uint8_t*>(&data[field->offset]));
     }
   }
   else
@@ -343,7 +373,9 @@ bool mrpt::ros2bridge::fromROS(
   const sensor_msgs::msg::PointField* z_field = nullptr;
   const sensor_msgs::msg::PointField* t_field = nullptr;
   std::map<std::string, const sensor_msgs::msg::PointField*> other_fields_float;
-  std::map<std::string, const sensor_msgs::msg::PointField*> other_fields_uint;
+  std::map<std::string, const sensor_msgs::msg::PointField*> other_fields_double;
+  std::map<std::string, const sensor_msgs::msg::PointField*> other_fields_uint8;
+  std::map<std::string, const sensor_msgs::msg::PointField*> other_fields_uint16;
 
   for (const auto& field : msg.fields)
   {
@@ -364,17 +396,26 @@ bool mrpt::ros2bridge::fromROS(
       continue;
     }
 
-    if (field.datatype == sensor_msgs::msg::PointField::FLOAT32 ||
-        field.datatype == sensor_msgs::msg::PointField::FLOAT64)
+    // In MRPT CGenericPointsMap we support: double/float/uint16/uint8:
+    if (field.datatype == sensor_msgs::msg::PointField::UINT16)
+    {
+      other_fields_uint16[field.name] = &field;
+    }
+#if MRPT_VERSION >= 0x020f03  // 2.15.3
+    else if (field.datatype == sensor_msgs::msg::PointField::UINT8)
+    {
+      other_fields_uint8[field.name] = &field;
+    }
+    else if (field.datatype == sensor_msgs::msg::PointField::FLOAT64)
+    {
+      other_fields_double[field.name] = &field;
+    }
+#endif
+    // Then, for float32, and for
+    // anything else (very rarely used fields?), we convert into "float"
+    else
     {
       other_fields_float[field.name] = &field;
-    }
-    else if (
-        field.datatype == sensor_msgs::msg::PointField::UINT16 ||
-        field.datatype == sensor_msgs::msg::PointField::UINT32 ||
-        field.datatype == sensor_msgs::msg::PointField::UINT8)
-    {
-      other_fields_uint[field.name] = &field;
     }
   }
 
@@ -387,7 +428,7 @@ bool mrpt::ros2bridge::fromROS(
   {
     obj.registerField_float(name);
   }
-  for (const auto& [name, _] : other_fields_uint)
+  for (const auto& [name, _] : other_fields_uint16)
   {
     obj.registerField_uint16(name);
   }
@@ -395,6 +436,16 @@ bool mrpt::ros2bridge::fromROS(
   {
     obj.registerField_float("t");
   }
+#if MRPT_VERSION >= 0x020f03  // 2.15.3
+  for (const auto& [name, _] : other_fields_double)
+  {
+    obj.registerField_double(name);
+  }
+  for (const auto& [name, _] : other_fields_uint8)
+  {
+    obj.registerField_uint8(name);
+  }
+#endif
 
   obj.resize(num_points);
 
@@ -419,12 +470,26 @@ bool mrpt::ros2bridge::fromROS(
         get_float_from_field(field_ptr, msg_data, val);
         obj.setPointField_float(idx, name, val);
       }
-      for (const auto& [name, field_ptr] : other_fields_uint)
+      for (const auto& [name, field_ptr] : other_fields_uint16)
       {
         uint16_t val = 0;
         get_uint16_from_field(field_ptr, msg_data, val);
         obj.setPointField_uint16(idx, name, val);
       }
+#if MRPT_VERSION >= 0x020f03  // 2.15.3
+      for (const auto& [name, field_ptr] : other_fields_double)
+      {
+        double val = 0;
+        get_double_from_field(field_ptr, msg_data, val);
+        obj.setPointField_double(idx, name, val);
+      }
+      for (const auto& [name, field_ptr] : other_fields_uint8)
+      {
+        uint8_t val = 0;
+        get_uint8_from_field(field_ptr, msg_data, val);
+        obj.setPointField_uint8(idx, name, val);
+      }
+#endif
 
       if (t_field)
       {
