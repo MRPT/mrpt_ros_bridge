@@ -32,14 +32,17 @@ class MapHdl
 {
  private:
 #ifdef OCCUPANCY_GRIDMAP_CELL_SIZE_8BITS
-  int lut_cellmrpt2ros[0x100];  // lookup table for entry convertion
+  int lut_cell_mrpt2ros[0x100] = {};  // lookup table for entry convertion
 #else
-  int lut_cellmrpt2ros[0xFFFF];  // lookup table for entry convertion
+  int lut_cell_mrpt2ros[0xFFFF] = {};  // lookup table for entry convertion
 #endif
-  int lut_cellros2mrpt[101];  // lookup table for entry convertion
+  int lut_cell_ros2mrpt[101] = {};  // lookup table for entry convertion
 
   MapHdl();
-  MapHdl(const MapHdl&);
+  MapHdl(const MapHdl&) = delete;
+  MapHdl& operator=(const MapHdl&) = delete;
+  MapHdl(MapHdl&&) = delete;
+  MapHdl& operator=(MapHdl&&) = delete;
   ~MapHdl() = default;
 
  public:
@@ -53,7 +56,7 @@ class MapHdl
 #ifdef OCCUPANCY_GRIDMAP_CELL_SIZE_8BITS
   int8_t cellMrpt2Ros(int8_t i)
   {
-    return static_cast<int8_t>(lut_cellmrpt2ros[static_cast<int>(i) - INT8_MIN]);
+    return static_cast<int8_t>(lut_cell_mrpt2ros[static_cast<int>(i) - INT8_MIN]);
   }
 #else
   int16_t cellMrpt2Ros(int16_t i)
@@ -69,7 +72,7 @@ class MapHdl
       return 0;
     }
     ASSERT_LE_(i, 100);
-    return static_cast<int8_t>(lut_cellros2mrpt[i]);
+    return static_cast<int8_t>(lut_cell_ros2mrpt[i]);
   }
 
   /**

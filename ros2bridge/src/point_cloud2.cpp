@@ -640,7 +640,11 @@ bool mrpt::ros2bridge::toROS(
     }
     for (const auto& un : uint16_fields)
     {
+#if MRPT_VERSION >= 0x020f04  // 2.15.4
+      const auto* v = obj.getPointsBufferRef_uint16_field(un);
+#else
       const auto* v = obj.getPointsBufferRef_uint_field(un);
+#endif
       ASSERT_(v);
       ASSERT_EQUAL_(v->size(), N);
       uint16_bufs[un] = v;
@@ -716,7 +720,7 @@ bool mrpt::ros2bridge::toROS(
   msg.row_step = msg.width * msg.point_step;
 
   // data:
-  msg.data.resize(msg.row_step * msg.height);
+  msg.data.resize(static_cast<size_t>(msg.row_step) * msg.height);
 
   const auto& xs = obj.getPointsBufferRef_x();
   const auto& ys = obj.getPointsBufferRef_y();
@@ -813,7 +817,13 @@ bool mrpt::ros2bridge::toROS(
 
 #if MRPT_VERSION >= 0x20f00  // 2.15.0
   const auto* Is = obj.getPointsBufferRef_float_field(CPointsMapXYZIRT::POINT_FIELD_INTENSITY);
+
+#if MRPT_VERSION >= 0x020f04  // 2.15.4
+  const auto* Rs = obj.getPointsBufferRef_uint16_field(CPointsMapXYZIRT::POINT_FIELD_RING_ID);
+#else
   const auto* Rs = obj.getPointsBufferRef_uint_field(CPointsMapXYZIRT::POINT_FIELD_RING_ID);
+#endif
+
   const auto* Ts = obj.getPointsBufferRef_float_field(CPointsMapXYZIRT::POINT_FIELD_TIMESTAMP);
 #else
   const auto* Is = obj.getPointsBufferRef_intensity();

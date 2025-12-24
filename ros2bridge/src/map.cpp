@@ -58,21 +58,18 @@ MapHdl::MapHdl()
     }
     else
     {
-      float p = 1.0 - table.l2p(i);
-      ros_val = round(p * 100.);
-      // printf("- cell -> ros = %4i -> %4i, p=%4.3f\n", i, ros_val, p);
+      float p = 1.0f - table.l2p(static_cast<COccupancyGridMap2D::cell_t>(i));
+      ros_val = static_cast<int8_t>(round(p * 100.));
     }
 
-    lut_cellmrpt2ros[static_cast<int>(i) - i_min] = ros_val;
+    lut_cell_mrpt2ros[static_cast<int>(i) - i_min] = static_cast<unsigned char>(ros_val);
   }
 
   // ROS -> MRPT: [0,100] ->
   for (int i = 0; i <= 100; i++)
   {
-    const float p = 1.0 - (i / 100.0);
-    lut_cellros2mrpt[i] = table.p2l(p);
-
-    // printf("- ros->cell=%4i->%4i p=%4.3f\n",i, lut_cellros2mrpt[i], p);
+    const float p = 1.0f - (static_cast<float>(i) / 100.0f);
+    lut_cell_ros2mrpt[i] = static_cast<unsigned char>(table.p2l(p));
   }
 }
 MapHdl* MapHdl::instance()
@@ -90,17 +87,17 @@ bool mrpt::ros2bridge::fromROS(const nav_msgs::msg::OccupancyGrid& src, COccupan
     std::cerr << "[fromROS] Rotated maps are not supported!\n";
     return false;
   }
-  float xmin = src.info.origin.position.x;
-  float ymin = src.info.origin.position.y;
-  float xmax = xmin + src.info.width * src.info.resolution;
-  float ymax = ymin + src.info.height * src.info.resolution;
+  const auto xmin = static_cast<float>(src.info.origin.position.x);
+  const auto ymin = static_cast<float>(src.info.origin.position.y);
+  const auto xmax = xmin + static_cast<float>(src.info.width) * src.info.resolution;
+  const auto ymax = ymin + static_cast<float>(src.info.height) * src.info.resolution;
 
   des.setSize(xmin, xmax, ymin, ymax, src.info.resolution);
   auto inst = MapHdl::instance();
   for (unsigned int h = 0; h < src.info.height; h++)
   {
-    COccupancyGridMap2D::cellType* pDes = des.getRow(h);
-    const int8_t* pSrc = &src.data[h * src.info.width];
+    COccupancyGridMap2D::cellType* pDes = des.getRow(static_cast<int>(h));
+    const int8_t* pSrc = &src.data[static_cast<size_t>(h) * src.info.width];
     for (unsigned int w = 0; w < src.info.width; w++)
     {
       *pDes++ = inst->cellRos2Mrpt(*pSrc++);
@@ -136,12 +133,12 @@ bool mrpt::ros2bridge::toROS(
   des.info.origin.orientation.w = 1;
 
   // I hope the data is always aligned
-  des.data.resize(des.info.width * des.info.height);
+  des.data.resize(static_cast<size_t>(des.info.width) * des.info.height);
   for (unsigned int h = 0; h < des.info.height; h++)
   {
-    const COccupancyGridMap2D::cellType* pSrc = src.getRow(h);
+    const COccupancyGridMap2D::cellType* pSrc = src.getRow(static_cast<int>(h));
     ASSERT_(pSrc);
-    int8_t* pDes = &des.data[h * des.info.width];
+    int8_t* pDes = &des.data[static_cast<size_t>(h) * des.info.width];
     for (unsigned int w = 0; w < des.info.width; w++)
     {
       if (as_costmap)
@@ -208,7 +205,7 @@ bool MapHdl::loadMap(
     CFileGZInputStream f(_map_file);
     mrpt::serialization::archiveFrom(f) >> simpleMap;
 
-    ASSERTMSG_(simpleMap.size() > 0, "Simplemap was aparently loaded OK, but it is empty!");
+    ASSERTMSG_(simpleMap.size() > 0, "Simplemap was apparently loaded OK, but it is empty!");
 
     // Build metric map:
     if (_debug)
