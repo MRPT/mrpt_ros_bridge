@@ -2,8 +2,8 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+3.1.1 (2025-12-26)
+------------------
 * Prepare for API change in mrpt 2.15.4
 * Contributors: Jose Luis Blanco-Claraco
 
