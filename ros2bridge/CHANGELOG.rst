@@ -2,6 +2,11 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Prepare for API change in mrpt 2.15.4
+* Contributors: Jose Luis Blanco-Claraco
+
 3.1.0 (2025-12-23)
 ------------------
 * PointCloud2 to CGenericPointsMap: parse remaining fields of unsupported types as float
