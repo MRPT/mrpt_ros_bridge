@@ -28,26 +28,32 @@ bool mrpt::ros2bridge::fromROS(
   obj.maxRange = msg.range_max;
   obj.sensorPose = pose;
 
-  ASSERT_(msg.ranges.size() > 1);
+#if MRPT_VERSION >= 0x020f06
+  obj.sweepDuration = msg.scan_time;
+#endif
+
+  ASSERT_GT_(msg.ranges.size(), 2);
 
   const size_t N = msg.ranges.size();
-  const double ang_step = obj.aperture / (N - 1);
-  const double fov05 = 0.5 * obj.aperture;
-  const double inv_ang_step = (N - 1) / obj.aperture;
+  const auto N_f = static_cast<float>(N);
+  const float ang_step = obj.aperture / (N_f - 1);
+  const float fov05 = 0.5f * obj.aperture;
+  const float inv_ang_step = (N_f - 1) / obj.aperture;
 
   obj.resizeScan(N);
   for (std::size_t i_mrpt = 0; i_mrpt < N; i_mrpt++)
   {
     // ROS indices go from msg.angle_min to msg.angle_max, while
     // in MRPT they go from -FOV/2 to +FOV/2.
-    int i_ros = inv_ang_step * (-fov05 - msg.angle_min + ang_step * i_mrpt);
+    auto i_ros = static_cast<int>(
+        inv_ang_step * (-fov05 - msg.angle_min + ang_step * static_cast<float>(i_mrpt)));
     if (i_ros < 0)
     {
-      i_ros += N;
+      i_ros += static_cast<int>(N);
     }
-    else if (i_ros >= (int)N)
+    else if (i_ros >= static_cast<int>(N))
     {
-      i_ros -= N;  // wrap around 2PI...
+      i_ros -= static_cast<int>(N);  // wrap around 2PI...
     }
 
     // set the scan
@@ -67,6 +73,7 @@ bool mrpt::ros2bridge::toROS(
     const mrpt::obs::CObservation2DRangeScan& obj, sensor_msgs::msg::LaserScan& msg)
 {
   const size_t nRays = obj.getScanSize();
+  const auto nRays_f = static_cast<float>(nRays);
   if (!nRays)
   {
     return false;
@@ -74,11 +81,15 @@ bool mrpt::ros2bridge::toROS(
 
   msg.angle_min = -0.5f * obj.aperture;
   msg.angle_max = 0.5f * obj.aperture;
-  msg.angle_increment = obj.aperture / (obj.getScanSize() - 1);
+  msg.angle_increment = obj.aperture / (nRays_f - 1.0f);
 
-  // setting the following values to zero solves a rviz visualization problem
-  msg.time_increment = 0.0;  // 1./30.; // Anything better?
-  msg.scan_time = 0.0;       // msg.time_increment; // idem?
+#if MRPT_VERSION >= 0x020f06
+  msg.time_increment = obj.sweepDuration / nRays_f;
+  msg.scan_time = obj.sweepDuration;
+#else
+  msg.time_increment = 0.0;
+  msg.scan_time = 0.0;
+#endif
 
   msg.range_min = 0.02f;
   msg.range_max = obj.maxRange;
