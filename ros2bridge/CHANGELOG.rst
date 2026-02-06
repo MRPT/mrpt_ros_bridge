@@ -2,6 +2,14 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Merge pull request `#1 <https://github.com/MRPT/mrpt_ros_bridge/issues/1>`_ from MRPT/feat/export-pointcloud-color
+  Fix: export RGB color clouds in the expected format by RViz/PCL
+* Fix: export RGB color clouds in the expected format by RViz/PCL
+* Support LaserScan.scan_time for mrpt 2.15.6
+* Contributors: Jose Luis Blanco-Claraco
+
 3.1.1 (2025-12-26)
 ------------------
 * Prepare for API change in mrpt 2.15.4
