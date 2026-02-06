@@ -531,155 +531,334 @@ bool mrpt::ros2bridge::fromROS(
   }
   return true;
 }
-
 bool mrpt::ros2bridge::toROS(
     const mrpt::maps::CGenericPointsMap& obj,
     const std_msgs::msg::Header& msg_header,
     sensor_msgs::msg::PointCloud2& msg)
 {
-  //
+  msg.header = msg_header;
+
+  // Unordered cloud:
+  msg.height = 1;
+  msg.width = obj.size();
+
+  // ---------------------------------------------------------------
+  // Detect RGB color channels
+  // ---------------------------------------------------------------
+  // Two conventions in MRPT CGenericPointsMap / CPointsMap:
+  //   uint8:  color_r, color_g, color_b  (range [0, 255])
+  //   float:  color_rf, color_gf, color_bf (range [0, 1])
+  // We merge whichever is present into a single "rgb" field using
+  // the PCL/RViz packed-float convention.
+  const bool hasColorU8 = obj.hasColor_u8();
+  const bool hasColorF = obj.hasColor_f();
+  const bool hasAnyColor = hasColorU8 || hasColorF;
+
+  // Names of individual color channels to exclude from generic export:
+  static const std::array<std::string_view, 6> colorFieldNames = {
+      CPointsMap::POINT_FIELD_COLOR_Ru8, CPointsMap::POINT_FIELD_COLOR_Gu8,
+      CPointsMap::POINT_FIELD_COLOR_Bu8, CPointsMap::POINT_FIELD_COLOR_Rf,
+      CPointsMap::POINT_FIELD_COLOR_Gf,  CPointsMap::POINT_FIELD_COLOR_Bf};
+
+  auto isColorField = [&](const std::string_view& name) -> bool
   {
-    msg.header = msg_header;
-
-    // 2D structure of the point cloud. If the cloud is unordered, height is
-    //  1 and width is the length of the point cloud.
-    msg.height = 1;
-    msg.width = obj.size();
-
-    // Basic XYZ fields:
-    std::vector<std::string> names = {"x", "y", "z"};
-    std::vector<size_t> offsets = {0, sizeof(float) * 1, sizeof(float) * 2};
-    size_t point_step = sizeof(float) * 3;
-
-    // Gather additional registered fields in the generic map:
-    // Float fields (including "t" if present) and unsigned integer fields (uint16)
-    std::vector<std::string_view> float_fields;
-    std::vector<std::string_view> uint16_fields;
-
-    // The following two calls assume CGenericPointsMap exposes methods to list
-    // registered fields. Adjust these method names to the actual API if needed.
-    float_fields = obj.getPointFieldNames_float();
-    uint16_fields = obj.getPointFieldNames_uint16();
-
-    // Remove x,y,z from the registered lists if present:
-    auto remove_name = [](std::vector<std::string_view>& vec, const std::string& n)
-    { vec.erase(std::remove(vec.begin(), vec.end(), n), vec.end()); };
-    remove_name(float_fields, "x");
-    remove_name(float_fields, "y");
-    remove_name(float_fields, "z");
-    remove_name(uint16_fields, "x");
-    remove_name(uint16_fields, "y");
-    remove_name(uint16_fields, "z");
-
-    // Append float fields
-    for (const auto& fn : float_fields)
+    for (const auto& cn : colorFieldNames)
     {
-      names.push_back(std::string(fn));
-      offsets.push_back(point_step);
-      point_step += sizeof(float);
-    }
-
-    // Append uint16 fields
-    for (const auto& un : uint16_fields)
-    {
-      names.push_back(std::string(un));
-      offsets.push_back(point_step);
-      point_step += sizeof(uint16_t);
-    }
-
-    // Build msg.fields
-    msg.fields.resize(names.size());
-    for (size_t i = 0; i < names.size(); ++i)
-    {
-      auto& f = msg.fields[i];
-      f.count = 1;
-      f.offset = static_cast<uint32_t>(offsets[i]);
-      // ring-like uint16 fields:
-      if (std::find(uint16_fields.begin(), uint16_fields.end(), names[i]) != uint16_fields.end())
+      if (name == cn)
       {
-        f.datatype = sensor_msgs::msg::PointField::UINT16;
+        return true;
       }
-      else
-      {
-        f.datatype = sensor_msgs::msg::PointField::FLOAT32;
-      }
-      f.name = names[i];
     }
+    return false;
+  };
+
+  // ---------------------------------------------------------------
+  // Collect field metadata
+  // ---------------------------------------------------------------
+  // Basic XYZ:
+  std::vector<std::string> names = {"x", "y", "z"};
+  std::vector<size_t> offsets = {0, sizeof(float) * 1, sizeof(float) * 2};
+  size_t point_step = sizeof(float) * 3;
+  // Track the PointField datatype for each entry in names[]:
+  std::vector<uint8_t> datatypes = {
+      sensor_msgs::msg::PointField::FLOAT32, sensor_msgs::msg::PointField::FLOAT32,
+      sensor_msgs::msg::PointField::FLOAT32};
+
+  // Helper to skip xyz and color channels:
+  auto remove_xyz = [](std::vector<std::string_view>& vec)
+  {
+    auto it = std::remove_if(
+        vec.begin(), vec.end(),
+        [](const std::string_view& n) { return n == "x" || n == "y" || n == "z"; });
+    vec.erase(it, vec.end());
+  };
+  auto remove_color = [&](std::vector<std::string_view>& vec)
+  {
+    auto it = std::remove_if(
+        vec.begin(), vec.end(), [&](const std::string_view& n) { return isColorField(n); });
+    vec.erase(it, vec.end());
+  };
+
+  // Gather all field name lists, filtering out xyz and color:
+  auto float_fields = obj.getPointFieldNames_float();
+  remove_xyz(float_fields);
+  remove_color(float_fields);
+
+  auto uint16_fields = obj.getPointFieldNames_uint16();
+  remove_xyz(uint16_fields);
+  remove_color(uint16_fields);
+
+#if MRPT_VERSION >= 0x020f03  // 2.15.3
+  auto uint8_fields = obj.getPointFieldNames_uint8();
+  remove_color(uint8_fields);  // strip color_r/g/b; we handle them via "rgb"
+
+  auto double_fields = obj.getPointFieldNames_double();
+  remove_color(double_fields);
+#endif
+
+  // Append packed "rgb" field if color is available:
+  // Declared as FLOAT32 (4 bytes = packed 0x00RRGGBB) per PCL/RViz convention.
+  size_t rgb_offset = 0;
+  if (hasAnyColor)
+  {
+    names.push_back("rgb");
+    rgb_offset = point_step;
+    offsets.push_back(point_step);
+    datatypes.push_back(sensor_msgs::msg::PointField::FLOAT32);
+    point_step += sizeof(float);
+  }
+
+  // Append float fields:
+  for (const auto& fn : float_fields)
+  {
+    names.push_back(std::string(fn));
+    offsets.push_back(point_step);
+    datatypes.push_back(sensor_msgs::msg::PointField::FLOAT32);
+    point_step += sizeof(float);
+  }
+
+  // Append uint16 fields:
+  for (const auto& un : uint16_fields)
+  {
+    names.push_back(std::string(un));
+    offsets.push_back(point_step);
+    datatypes.push_back(sensor_msgs::msg::PointField::UINT16);
+    point_step += sizeof(uint16_t);
+  }
+
+#if MRPT_VERSION >= 0x020f03  // 2.15.3
+  // Append uint8 fields (non-color ones):
+  for (const auto& u8n : uint8_fields)
+  {
+    names.push_back(std::string(u8n));
+    offsets.push_back(point_step);
+    datatypes.push_back(sensor_msgs::msg::PointField::UINT8);
+    point_step += sizeof(uint8_t);
+  }
+
+  // Append double fields:
+  for (const auto& dn : double_fields)
+  {
+    names.push_back(std::string(dn));
+    offsets.push_back(point_step);
+    datatypes.push_back(sensor_msgs::msg::PointField::FLOAT64);
+    point_step += sizeof(double);
+  }
+#endif
+
+  // ---------------------------------------------------------------
+  // Build msg.fields
+  // ---------------------------------------------------------------
+  msg.fields.resize(names.size());
+  for (size_t i = 0; i < names.size(); ++i)
+  {
+    auto& f = msg.fields[i];
+    f.name = names[i];
+    f.count = 1;
+    f.offset = static_cast<uint32_t>(offsets[i]);
+    f.datatype = datatypes[i];
+  }
 
 #if MRPT_IS_BIG_ENDIAN
-    msg.is_bigendian = true;
+  msg.is_bigendian = true;
 #else
-    msg.is_bigendian = false;
+  msg.is_bigendian = false;
 #endif
 
-    msg.point_step = static_cast<uint32_t>(point_step);
-    msg.row_step = msg.width * msg.point_step;
+  msg.point_step = static_cast<uint32_t>(point_step);
+  msg.row_step = msg.width * msg.point_step;
+  msg.data.resize(static_cast<std::size_t>(msg.row_step) * msg.height);
 
-    // Resize data buffer
-    msg.data.resize(static_cast<std::size_t>(msg.row_step) * msg.height);
+  // ---------------------------------------------------------------
+  // Prepare buffer pointers for all field types
+  // ---------------------------------------------------------------
+  const auto& xs = obj.getPointsBufferRef_x();
+  const auto& ys = obj.getPointsBufferRef_y();
+  const auto& zs = obj.getPointsBufferRef_z();
+  const size_t N = xs.size();
+  ASSERT_EQUAL_(ys.size(), N);
+  ASSERT_EQUAL_(zs.size(), N);
+  ASSERT_EQUAL_(msg.width, N);
 
-    // Access base point coordinate buffers:
-    const auto& xs = obj.getPointsBufferRef_x();
-    const auto& ys = obj.getPointsBufferRef_y();
-    const auto& zs = obj.getPointsBufferRef_z();
-    const size_t N = xs.size();
-    ASSERT_EQUAL_(ys.size(), N);
-    ASSERT_EQUAL_(zs.size(), N);
-    ASSERT_EQUAL_(msg.width, N);
-
-    // Prepare pointers to additional fields buffers:
-    std::map<std::string_view, const mrpt::aligned_std_vector<float>*> float_bufs;
-    std::map<std::string_view, const mrpt::aligned_std_vector<uint16_t>*> uint16_bufs;
-
-    for (const auto& fn : float_fields)
-    {
-      const auto* v = obj.getPointsBufferRef_float_field(fn);
-      ASSERT_(v);
-      ASSERT_EQUAL_(v->size(), N);
-      float_bufs[fn] = v;
-    }
-    for (const auto& un : uint16_fields)
-    {
-#if MRPT_VERSION >= 0x020f04  // 2.15.4
-      const auto* v = obj.getPointsBufferRef_uint16_field(un);
-#else
-      const auto* v = obj.getPointsBufferRef_uint_field(un);
+  // Color source buffers (whichever variant is available):
+  const mrpt::aligned_std_vector<float>* color_rf_buf = nullptr;
+  const mrpt::aligned_std_vector<float>* color_gf_buf = nullptr;
+  const mrpt::aligned_std_vector<float>* color_bf_buf = nullptr;
+#if MRPT_VERSION >= 0x020f03
+  const mrpt::aligned_std_vector<uint8_t>* color_ru8_buf = nullptr;
+  const mrpt::aligned_std_vector<uint8_t>* color_gu8_buf = nullptr;
+  const mrpt::aligned_std_vector<uint8_t>* color_bu8_buf = nullptr;
 #endif
-      ASSERT_(v);
-      ASSERT_EQUAL_(v->size(), N);
-      uint16_bufs[un] = v;
-    }
 
-    // Fill data per point
-    uint8_t* dst = msg.data.data();
-    for (size_t i = 0; i < N; ++i)
-    {
-      // x,y,z
-      memcpy(dst + offsets[0], &xs[i], sizeof(float));
-      memcpy(dst + offsets[1], &ys[i], sizeof(float));
-      memcpy(dst + offsets[2], &zs[i], sizeof(float));
-
-      // float fields
-      for (size_t fi = 0; fi < float_fields.size(); ++fi)
-      {
-        const auto& name = float_fields[fi];
-        const auto* buf = float_bufs[name];
-        memcpy(dst + offsets[3 + fi], &(*buf)[i], sizeof(float));
-      }
-
-      // uint16 fields
-      for (size_t ui = 0; ui < uint16_fields.size(); ++ui)
-      {
-        const auto& name = uint16_fields[ui];
-        const auto* buf = uint16_bufs[name];
-        memcpy(dst + offsets[3 + float_fields.size() + ui], &(*buf)[i], sizeof(uint16_t));
-      }
-
-      dst += msg.point_step;
-    }
-
-    return true;
+  if (hasColorF)
+  {
+    color_rf_buf = obj.getPointsBufferRef_float_field(CPointsMap::POINT_FIELD_COLOR_Rf);
+    color_gf_buf = obj.getPointsBufferRef_float_field(CPointsMap::POINT_FIELD_COLOR_Gf);
+    color_bf_buf = obj.getPointsBufferRef_float_field(CPointsMap::POINT_FIELD_COLOR_Bf);
+    ASSERT_(color_rf_buf && color_gf_buf && color_bf_buf);
+    ASSERT_EQUAL_(color_rf_buf->size(), N);
+    ASSERT_EQUAL_(color_gf_buf->size(), N);
+    ASSERT_EQUAL_(color_bf_buf->size(), N);
   }
+#if MRPT_VERSION >= 0x020f03
+  else if (hasColorU8)
+  {
+    color_ru8_buf = obj.getPointsBufferRef_uint8_field(CPointsMap::POINT_FIELD_COLOR_Ru8);
+    color_gu8_buf = obj.getPointsBufferRef_uint8_field(CPointsMap::POINT_FIELD_COLOR_Gu8);
+    color_bu8_buf = obj.getPointsBufferRef_uint8_field(CPointsMap::POINT_FIELD_COLOR_Bu8);
+    ASSERT_(color_ru8_buf && color_gu8_buf && color_bu8_buf);
+    ASSERT_EQUAL_(color_ru8_buf->size(), N);
+    ASSERT_EQUAL_(color_gu8_buf->size(), N);
+    ASSERT_EQUAL_(color_bu8_buf->size(), N);
+  }
+#endif
+
+  // Generic float field buffers:
+  std::vector<const mrpt::aligned_std_vector<float>*> float_bufs;
+  float_bufs.reserve(float_fields.size());
+  for (const auto& fn : float_fields)
+  {
+    const auto* v = obj.getPointsBufferRef_float_field(fn);
+    ASSERT_(v);
+    ASSERT_EQUAL_(v->size(), N);
+    float_bufs.push_back(v);
+  }
+
+  // Generic uint16 field buffers:
+  std::vector<const mrpt::aligned_std_vector<uint16_t>*> uint16_bufs;
+  uint16_bufs.reserve(uint16_fields.size());
+  for (const auto& un : uint16_fields)
+  {
+#if MRPT_VERSION >= 0x020f04  // 2.15.4
+    const auto* v = obj.getPointsBufferRef_uint16_field(un);
+#else
+    const auto* v = obj.getPointsBufferRef_uint_field(un);
+#endif
+    ASSERT_(v);
+    ASSERT_EQUAL_(v->size(), N);
+    uint16_bufs.push_back(v);
+  }
+
+#if MRPT_VERSION >= 0x020f03
+  // Generic uint8 field buffers (non-color):
+  std::vector<const mrpt::aligned_std_vector<uint8_t>*> uint8_bufs;
+  uint8_bufs.reserve(uint8_fields.size());
+  for (const auto& u8n : uint8_fields)
+  {
+    const auto* v = obj.getPointsBufferRef_uint8_field(u8n);
+    ASSERT_(v);
+    ASSERT_EQUAL_(v->size(), N);
+    uint8_bufs.push_back(v);
+  }
+
+  // Generic double field buffers:
+  std::vector<const mrpt::aligned_std_vector<double>*> double_bufs;
+  double_bufs.reserve(double_fields.size());
+  for (const auto& dn : double_fields)
+  {
+    const auto* v = obj.getPointsBufferRef_double_field(dn);
+    ASSERT_(v);
+    ASSERT_EQUAL_(v->size(), N);
+    double_bufs.push_back(v);
+  }
+#endif
+
+  // ---------------------------------------------------------------
+  // Fill per-point data
+  // ---------------------------------------------------------------
+  // Track offsets by field group for the inner loop.
+  // Layout in names[]: x(0), y(1), z(2), [rgb(3)], floats..., uint16s..., [uint8s..., doubles...]
+  // We use direct offset values already stored in offsets[].
+  const size_t firstFloatIdx = 3 + (hasAnyColor ? 1 : 0);
+  const size_t firstU16Idx = firstFloatIdx + float_fields.size();
+#if MRPT_VERSION >= 0x020f03
+  const size_t firstU8Idx = firstU16Idx + uint16_fields.size();
+  const size_t firstDblIdx = firstU8Idx + uint8_fields.size();
+#endif
+
+  uint8_t* dst = msg.data.data();
+  for (size_t i = 0; i < N; ++i)
+  {
+    // x, y, z
+    std::memcpy(dst + offsets[0], &xs[i], sizeof(float));
+    std::memcpy(dst + offsets[1], &ys[i], sizeof(float));
+    std::memcpy(dst + offsets[2], &zs[i], sizeof(float));
+
+    // Packed rgb (PCL/RViz convention: uint32 0x00RRGGBB reinterpreted as float)
+    if (hasAnyColor)
+    {
+      uint8_t r = 0, g = 0, b = 0;
+      if (hasColorF)
+      {
+        // float [0,1] → uint8 [0,255]
+        r = static_cast<uint8_t>(std::min(255.0f, std::max(0.0f, (*color_rf_buf)[i] * 255.0f)));
+        g = static_cast<uint8_t>(std::min(255.0f, std::max(0.0f, (*color_gf_buf)[i] * 255.0f)));
+        b = static_cast<uint8_t>(std::min(255.0f, std::max(0.0f, (*color_bf_buf)[i] * 255.0f)));
+      }
+#if MRPT_VERSION >= 0x020f03
+      else if (hasColorU8)
+      {
+        r = (*color_ru8_buf)[i];
+        g = (*color_gu8_buf)[i];
+        b = (*color_bu8_buf)[i];
+      }
+#endif
+
+      const uint32_t rgb_packed = (static_cast<uint32_t>(r) << 16) |
+                                  (static_cast<uint32_t>(g) << 8) | static_cast<uint32_t>(b);
+      std::memcpy(dst + rgb_offset, &rgb_packed, sizeof(uint32_t));
+    }
+
+    // Generic float fields
+    for (size_t fi = 0; fi < float_bufs.size(); ++fi)
+    {
+      std::memcpy(dst + offsets[firstFloatIdx + fi], &(*float_bufs[fi])[i], sizeof(float));
+    }
+
+    // Generic uint16 fields
+    for (size_t ui = 0; ui < uint16_bufs.size(); ++ui)
+    {
+      std::memcpy(dst + offsets[firstU16Idx + ui], &(*uint16_bufs[ui])[i], sizeof(uint16_t));
+    }
+
+#if MRPT_VERSION >= 0x020f03
+    // Generic uint8 fields (non-color)
+    for (size_t u8i = 0; u8i < uint8_bufs.size(); ++u8i)
+    {
+      std::memcpy(dst + offsets[firstU8Idx + u8i], &(*uint8_bufs[u8i])[i], sizeof(uint8_t));
+    }
+
+    // Generic double fields
+    for (size_t di = 0; di < double_bufs.size(); ++di)
+    {
+      std::memcpy(dst + offsets[firstDblIdx + di], &(*double_bufs[di])[i], sizeof(double));
+    }
+#endif
+
+    dst += msg.point_step;
+  }
+
+  return true;
 }
 
 #endif
