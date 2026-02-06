@@ -2,8 +2,8 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+3.2.0 (2026-02-06)
+------------------
 * Merge pull request `#1 <https://github.com/MRPT/mrpt_ros_bridge/issues/1>`_ from MRPT/feat/export-pointcloud-color
   Fix: export RGB color clouds in the expected format by RViz/PCL
 * Fix: export RGB color clouds in the expected format by RViz/PCL
