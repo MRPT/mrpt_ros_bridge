@@ -11,6 +11,7 @@ find_package(ament_cmake REQUIRED)
 # Find dependencies listed in package.xml
 find_package(geometry_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(gps_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(stereo_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
@@ -52,6 +53,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
   mrpt::maps
   nav_msgs::nav_msgs__rosidl_typesupport_cpp
   sensor_msgs::sensor_msgs_library
+  gps_msgs::gps_msgs__rosidl_typesupport_cpp
   std_msgs::std_msgs__rosidl_typesupport_cpp
   stereo_msgs::stereo_msgs__rosidl_typesupport_cpp
   tf2_geometry_msgs::tf2_geometry_msgs
@@ -77,6 +79,7 @@ ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
 ament_export_dependencies(
   geometry_msgs
   sensor_msgs
+  gps_msgs
   nav_msgs
   stereo_msgs
   std_msgs
