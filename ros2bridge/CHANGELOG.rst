@@ -2,8 +2,8 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+3.3.0 (2026-02-11)
+------------------
 * Merge pull request `#2 <https://github.com/MRPT/mrpt_ros_bridge/issues/2>`_ from MRPT/feat/support-gps-msgs
   Add support for gps_msgs types too
 * Add support for gps_msgs types too
