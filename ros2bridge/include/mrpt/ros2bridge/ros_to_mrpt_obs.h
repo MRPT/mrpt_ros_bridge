@@ -55,10 +55,10 @@ namespace mrpt::ros2bridge
  *  If \a fixedSensorPose is set, it is returned directly and tf2 is not
  *  queried.
  *
- * \param[out] des            The resulting pose.
- * \param[in]  tfBuffer       The tf2 buffer to query.
- * \param[in]  target_frame   Frame of the sensor (child frame).
- * \param[in]  source_frame   Reference frame (e.g. base_link).
+ * \param[out] des              The resulting pose.
+ * \param[in]  tfBuffer         The tf2 buffer to query.
+ * \param[in]  target_frame     Frame of the sensor (child frame).
+ * \param[in]  reference_frame  Reference frame (e.g. base_link).
  * \param[in]  fixedSensorPose  If provided, returned as-is (bypass tf2).
  *
  * \return true on success, false if the transform could not be resolved.
@@ -67,7 +67,7 @@ bool lookupSensorPose(
     mrpt::poses::CPose3D& des,
     tf2::BufferCore& tfBuffer,
     const std::string& target_frame,
-    const std::string& source_frame,
+    const std::string& reference_frame,
     const std::optional<mrpt::poses::CPose3D>& fixedSensorPose = std::nullopt,
     mrpt::system::COutputLogger* logger = nullptr);
 

@@ -53,7 +53,7 @@ bool lookupSensorPose(
     mrpt::poses::CPose3D& des,
     tf2::BufferCore& tfBuffer,
     const std::string& target_frame,
-    const std::string& source_frame,
+    const std::string& reference_frame,
     const std::optional<mrpt::poses::CPose3D>& fixedSensorPose,
     mrpt::system::COutputLogger* logger)
 {
@@ -66,17 +66,25 @@ bool lookupSensorPose(
   try
   {
     geometry_msgs::msg::TransformStamped ref_to_trgFrame =
-        tfBuffer.lookupTransform(target_frame, source_frame, {} /*latest*/);
+        tfBuffer.lookupTransform(reference_frame, target_frame, {} /*latest*/);
 
     tf2::Transform tf;
     tf2::fromMsg(ref_to_trgFrame.transform, tf);
     des = mrpt::ros2bridge::fromROS(tf);
+
+    if (logger && logger->isLoggingLevelVisible(mrpt::system::LVL_DEBUG))
+    {
+      logger->logFmt(
+          mrpt::system::LVL_DEBUG, "[lookupSensorPose] Found pose %s -> %s: %s",
+          reference_frame.c_str(), target_frame.c_str(), des.asString().c_str());
+    }
+
     return true;
   }
   catch (const tf2::TransformException& e)
   {
     const auto errMsg = mrpt::format(
-        "[lookupSensorPose] source_frame: '%s', target_frame: '%s': %s", source_frame.c_str(),
+        "[lookupSensorPose] reference_frame: '%s', target_frame: '%s': %s", reference_frame.c_str(),
         target_frame.c_str(), e.what());
 
     if (logger)
