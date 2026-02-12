@@ -437,7 +437,9 @@ class Transcriber
               sensorName, m, *tfBuffer, cli.base_link_frame, fixedSensorPose);
           return Obs(v.begin(), v.end());
         };
-        m_lookup[sensor.at("topic").as<std::string>()].emplace_back(callback);
+        // backwards compatible "image_topic". For the future, prefer "topic" for consistency.
+        const auto topicKey = sensor.count("topic") ? "topic" : "image_topic";
+        m_lookup[sensor.at(topicKey).as<std::string>()].emplace_back(callback);
       }
       else if (sensorType == "CObservationPointCloud")
       {
