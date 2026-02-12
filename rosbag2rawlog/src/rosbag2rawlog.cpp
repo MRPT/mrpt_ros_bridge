@@ -17,8 +17,6 @@
 
 // MRPT:
 #include <mrpt/containers/yaml.h>
-#include <mrpt/io/CFileGZInputStream.h>
-#include <mrpt/io/CFileGZOutputStream.h>
 #include <mrpt/obs/CActionCollection.h>
 #include <mrpt/obs/CActionRobotMovement3D.h>
 #include <mrpt/obs/CObservation2DRangeScan.h>
@@ -45,6 +43,12 @@
 
 #if MRPT_VERSION >= 0x20f00  // 2.15.0
 #include <mrpt/maps/CGenericPointsMap.h>
+#endif
+
+#if MRPT_VERSION >= 0x20f07  // 2.15.7
+#include <mrpt/io/CCompressedOutputStream.h>
+#else
+#include <mrpt/io/CFileGZOutputStream.h>
 #endif
 
 #include <CLI/CLI.hpp>
@@ -83,7 +87,6 @@
 #endif
 
 using namespace mrpt;
-using namespace mrpt::io;
 using namespace mrpt::serialization;
 using namespace mrpt::system;
 using namespace std;
@@ -583,7 +586,10 @@ int main(int argc, char** argv)
 
     std::cout << "List of topics found in the bag (" << nEntries << " msgs"
               << "):\n";
-    for (const auto& t : topics) std::cout << " " << t.name << " (" << t.type << ")\n";
+    for (const auto& t : topics)
+    {
+      std::cout << " " << t.name << " (" << t.type << ")\n";
+    }
 
     // Open output:
     if (mrpt::system::fileExists(output_rawlog_file) && !cli.overwrite)
@@ -593,9 +599,16 @@ int main(int argc, char** argv)
       return 1;
     }
 
-    CFileGZOutputStream fil_out;
+#if MRPT_VERSION >= 0x20f07  // 2.15.7
+    mrpt::io::CCompressedOutputStream fil_out;
+#else
+    mrpt::io::CFileGZOutputStream fil_out;
+#endif
     cout << "Opening for writing: '" << output_rawlog_file << "'...\n";
-    if (!fil_out.open(output_rawlog_file)) throw std::runtime_error("Error writing file!");
+    if (!fil_out.open(output_rawlog_file))
+    {
+      throw std::runtime_error("Error writing file!");
+    }
 
     auto arch = archiveFrom(fil_out);
 
@@ -637,7 +650,10 @@ int main(int argc, char** argv)
   }
   catch (std::exception& e)
   {
-    if (strlen(e.what())) std::cerr << mrpt::exception_to_str(e) << std::endl;
+    if (strlen(e.what()))
+    {
+      std::cerr << mrpt::exception_to_str(e) << std::endl;
+    }
     return 1;
   }
 }  // end of main()
