@@ -20,6 +20,10 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(cv_bridge REQUIRED)
 
 find_package(rosbag2_cpp QUIET)  # optional
+if(rosbag2_cpp_FOUND)
+  set(rosbag2_cpp_lib       rosbag2_cpp::rosbag2_cpp)
+  set(rosbag2_cpp_cmake_dep rosbag2_cpp)
+endif()
 
 
 # Find MRPT dependency (from mrpt_libmaps)
@@ -50,9 +54,7 @@ target_include_directories(${PROJECT_NAME}
 
 # Link dependencies
 target_link_libraries(${PROJECT_NAME} PUBLIC
-  #rclcpp::rclcpp
-  rosbag2_cpp::rosbag2_cpp
-  #tf2_msgs::tf2_msgs__rosidl_typesupport_cpp
+  ${rosbag2_cpp_lib}
   cv_bridge::cv_bridge
   geometry_msgs::geometry_msgs__rosidl_typesupport_cpp
   mrpt::maps
@@ -91,7 +93,7 @@ ament_export_dependencies(
   tf2
   tf2_geometry_msgs
   cv_bridge
-  rosbag2_cpp
+  ${rosbag2_cpp_cmake_dep}
   mrpt-maps
 )
 
