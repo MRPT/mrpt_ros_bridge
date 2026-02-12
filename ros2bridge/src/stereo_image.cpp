@@ -2,7 +2,7 @@
    |                     Mobile Robot Programming Toolkit (MRPT)            |
    |                          https://www.mrpt.org/                         |
    |                                                                        |
-   | Copyright (c) 2005-2025, Individual contributors, see AUTHORS file     |
+   | Copyright (c) 2005-2026, Individual contributors, see AUTHORS file     |
    | See: https://www.mrpt.org/Authors - All rights reserved.               |
    | Released under BSD License. See: https://www.mrpt.org/License          |
    +------------------------------------------------------------------------+ */
@@ -48,7 +48,7 @@ bool mrpt::ros2bridge::toROS(
   left.width = obj.imageLeft.getWidth();
 
   // right image
-  const Mat& cvImgR = obj.imageLeft.asCvMatRef();
+  const Mat& cvImgR = obj.imageRight.asCvMatRef();
 
   cv_bridge::CvImage img_bridge2;
   img_bridge2 = CvImage(right.header, sensor_msgs::image_encodings::BGR8, cvImgR);
