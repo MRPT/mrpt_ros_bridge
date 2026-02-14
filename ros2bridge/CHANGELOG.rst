@@ -2,8 +2,8 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+3.4.0 (2026-02-14)
+------------------
 * Merge pull request `#3 <https://github.com/MRPT/mrpt_ros_bridge/issues/3>`_ from MRPT/feat/refactor-rosbag2
   Refactor to reuse common code in mola bridge and rosbag input
 * fix reversed tf look up
