@@ -2,6 +2,15 @@
 Changelog for package rosbag2rawlog
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Merge pull request `#3 <https://github.com/MRPT/mrpt_ros_bridge/issues/3>`_ from MRPT/feat/refactor-rosbag2
+  Refactor to reuse common code in mola bridge and rosbag input
+* rosbag2rawlog: Use Zstd for output rawlog
+* "image_topic" as backwards compatible yaml entry
+* Refactor to reuse common code in mola bridge and rosbag input
+* Contributors: Jose Luis Blanco-Claraco
+
 3.3.0 (2026-02-11)
 ------------------
 
