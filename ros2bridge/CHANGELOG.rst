@@ -2,6 +2,13 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Merge pull request `#4 <https://github.com/MRPT/mrpt_ros_bridge/issues/4>`_ from MRPT/feat/parse-gps-fix
+  Support converting GpsFix messages too
+* Support converting GpsFix messages too
+* Contributors: Jose Luis Blanco-Claraco
+
 3.4.0 (2026-02-14)
 ------------------
 * Merge pull request `#3 <https://github.com/MRPT/mrpt_ros_bridge/issues/3>`_ from MRPT/feat/refactor-rosbag2
