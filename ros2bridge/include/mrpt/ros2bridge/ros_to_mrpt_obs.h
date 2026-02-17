@@ -25,6 +25,7 @@
 #include <mrpt/poses/CPose3D.h>
 #include <mrpt/system/COutputLogger.h>
 
+#include <gps_msgs/msg/gps_fix.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <optional>
 #include <sensor_msgs/msg/imu.hpp>
@@ -120,6 +121,12 @@ mrpt::obs::CObservationIMU::Ptr imuToObservation(
  */
 mrpt::obs::CObservationGPS::Ptr navSatFixToObservation(
     const sensor_msgs::msg::NavSatFix& gps, const std::string& sensorLabel);
+
+/** Convert a GpsFix message to CObservationGPS.
+ *  The caller is responsible for filling sensorPose afterwards.
+ */
+mrpt::obs::CObservationGPS::Ptr gpsFixToObservation(
+    const gps_msgs::msg::GPSFix& gps, const std::string& sensorLabel);
 
 /** Convert an Odometry message to CObservationOdometry. */
 mrpt::obs::CObservationOdometry::Ptr odometryToObservation(

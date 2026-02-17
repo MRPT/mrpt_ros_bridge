@@ -84,13 +84,14 @@ ObsVector rosbag2ToIMU(
     const std::string& base_link_frame,
     const std::optional<mrpt::poses::CPose3D>& fixedSensorPose);
 
-/** NavSatFix → CObservationGPS. */
+/** NavSatFix or GpsFix → CObservationGPS. */
 ObsVector rosbag2ToGPS(
     std::string_view sensorLabel,
     const rosbag2_storage::SerializedBagMessage& rosmsg,
     tf2::BufferCore& tfBuffer,
     const std::string& base_link_frame,
-    const std::optional<mrpt::poses::CPose3D>& fixedSensorPose);
+    const std::optional<mrpt::poses::CPose3D>& fixedSensorPose,
+    bool isGpsFix = false);
 
 /** Odometry → CObservationOdometry. */
 ObsVector rosbag2ToOdometry(

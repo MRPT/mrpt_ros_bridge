@@ -270,6 +270,21 @@ mrpt::obs::CObservationGPS::Ptr navSatFixToObservation(
 }
 
 // -----------------------------------------------------------------------
+//  gpsFixToObservation
+// -----------------------------------------------------------------------
+mrpt::obs::CObservationGPS::Ptr gpsFixToObservation(
+    const gps_msgs::msg::GPSFix& gps, const std::string& sensorLabel)
+{
+  auto obs = mrpt::obs::CObservationGPS::Create();
+  mrpt::ros2bridge::fromROS(gps, *obs);
+
+  obs->sensorLabel = sensorLabel;
+  obs->timestamp = mrpt::ros2bridge::fromROS(gps.header.stamp);
+
+  return obs;
+}
+
+// -----------------------------------------------------------------------
 //  odometryToObservation
 // -----------------------------------------------------------------------
 mrpt::obs::CObservationOdometry::Ptr odometryToObservation(
