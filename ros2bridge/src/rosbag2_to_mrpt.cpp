@@ -206,19 +206,33 @@ ObsVector rosbag2ToGPS(
     const rosbag2_storage::SerializedBagMessage& rosmsg,
     tf2::BufferCore& tfBuffer,
     const std::string& base_link_frame,
-    const std::optional<mrpt::poses::CPose3D>& fixedSensorPose)
+    const std::optional<mrpt::poses::CPose3D>& fixedSensorPose,
+    bool isGpsFix)
 {
   rclcpp::SerializedMessage serMsg(*rosmsg.serialized_data);
-  static rclcpp::Serialization<sensor_msgs::msg::NavSatFix> serializer;
 
-  sensor_msgs::msg::NavSatFix gps;
-  serializer.deserialize_message(&serMsg, &gps);
+  mrpt::obs::CObservationGPS::Ptr obs;
+  std::string frame_id;
 
-  auto obs = navSatFixToObservation(gps, std::string(sensorLabel));
+  if (isGpsFix)
+  {
+    static rclcpp::Serialization<gps_msgs::msg::GPSFix> serializer;
+    gps_msgs::msg::GPSFix gps;
+    serializer.deserialize_message(&serMsg, &gps);
+    obs = gpsFixToObservation(gps, std::string(sensorLabel));
+    frame_id = gps.header.frame_id;
+  }
+  else
+  {
+    static rclcpp::Serialization<sensor_msgs::msg::NavSatFix> serializer;
+    sensor_msgs::msg::NavSatFix gps;
+    serializer.deserialize_message(&serMsg, &gps);
+    obs = navSatFixToObservation(gps, std::string(sensorLabel));
+    frame_id = gps.header.frame_id;
+  }
 
   // Resolve sensor pose:
-  if (!lookupSensorPose(
-          obs->sensorPose, tfBuffer, gps.header.frame_id, base_link_frame, fixedSensorPose))
+  if (!lookupSensorPose(obs->sensorPose, tfBuffer, frame_id, base_link_frame, fixedSensorPose))
   {
     return {};
   }
