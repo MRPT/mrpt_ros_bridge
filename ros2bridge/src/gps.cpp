@@ -15,8 +15,10 @@
 
 #include <mrpt/ros2bridge/gps.h>
 #include <mrpt/ros2bridge/time.h>
+#include <mrpt/version.h>
 
 #include <cmath>
+#include <limits>
 
 namespace
 {
@@ -40,6 +42,7 @@ uint8_t gpsStatusToGgaFixQuality(int16_t status)
       return 0;
     case 0:  // STATUS_FIX
       return 1;
+    // NOLINTNEXTLINE
     case 1:      // STATUS_SBAS_FIX
     case 33:     // STATUS_WAAS_FIX (WAAS is a type of SBAS)
       return 2;  // DGPS-like augmentation
@@ -73,7 +76,7 @@ int16_t ggaFixQualityToGpsStatus(uint8_t fix_quality)
       return 19;  // STATUS_RTK_FIX
     case 5:
       return 20;  // STATUS_RTK_FLOAT
-    case 6:
+    case 6:       // NOLINT
     case 7:
     case 8:
       return 0;  // Estimated/manual/simulation -> STATUS_FIX
@@ -87,6 +90,10 @@ int16_t ggaFixQualityToGpsStatus(uint8_t fix_quality)
 bool mrpt::ros2bridge::fromROS(
     const sensor_msgs::msg::NavSatFix& msg, mrpt::obs::CObservationGPS& obj)
 {
+#if MRPT_VERSION >= 0x020f0b
+  using mrpt::obs::GnssFixType;
+#endif
+
   mrpt::obs::gnss::Message_NMEA_GGA gga;
   gga.fields.altitude_meters = msg.altitude;
   gga.fields.latitude_degrees = msg.latitude;
@@ -96,20 +103,46 @@ bool mrpt::ros2bridge::fromROS(
   {
     case -1:
       gga.fields.fix_quality = 0;
+#if MRPT_VERSION >= 0x020f0b
+      obj.fix_type = GnssFixType::NO_FIX;
+#endif
       break;
+
     case 0:
       gga.fields.fix_quality = 1;
+#if MRPT_VERSION >= 0x020f0b
+      obj.fix_type = GnssFixType::AUTONOMOUS;
+#endif
       break;
+
+#if MRPT_VERSION < 0x020f0b
+    case 1:  // NOLINT
+#else
+    case 1:
+#endif
+      gga.fields.fix_quality = 2;
+#if MRPT_VERSION >= 0x020f0b
+      obj.fix_type = GnssFixType::SBAS;
+#endif
+      break;
+
     case 2:
       gga.fields.fix_quality = 2;
-      break;
-    case 1:
-      gga.fields.fix_quality = 3;
+#if MRPT_VERSION >= 0x020f0b
+      obj.fix_type = GnssFixType::GBAS;
+#endif
       break;
     default:
       gga.fields.fix_quality = 0;  // never going to execute default
+#if MRPT_VERSION >= 0x020f0b
+      obj.fix_type = GnssFixType::UNKNOWN;
+#endif
   }
   obj.setMsg(gga);
+
+#if MRPT_VERSION >= 0x020f0b
+  obj.gnss_service_mask = static_cast<mrpt::obs::GnssService>(msg.status.service);
+#endif
 
   obj.timestamp = mrpt::ros2bridge::fromROS(msg.header.stamp);
 
@@ -133,6 +166,10 @@ bool mrpt::ros2bridge::toROS(
     const std_msgs::msg::Header& msg_header,
     sensor_msgs::msg::NavSatFix& msg)
 {
+#if MRPT_VERSION >= 0x020f0b
+  using mrpt::obs::GnssFixType;
+#endif
+
   bool valid = false;
 
   // 1) sensor_msgs::NavSatFix:: header
@@ -148,34 +185,72 @@ bool mrpt::ros2bridge::toROS(
     msg.latitude = gga.fields.latitude_degrees;
     msg.longitude = gga.fields.longitude_degrees;
 
-    /// following parameter assigned as per
-    /// http://mrpt.ual.es/reference/devel/structmrpt_1_1obs_1_1gnss_1_1_message___n_m_e_a___g_g_a_1_1content__t.html#a33415dc947663d43015605c41b0f66cb
-    /// http://mrpt.ual.es/reference/devel/gnss__messages__ascii__nmea_8h_source.html
-    switch (gga.fields.fix_quality)
+#if MRPT_VERSION >= 0x020f0b
+    if (obj.fix_type != GnssFixType::UNKNOWN)
     {
-      case 0:
-        msg.status.status = -1;
-        break;
-      case 1:
-        msg.status.status = 0;
-        break;
-      case 2:
-        msg.status.status = 2;
-        break;
-      case 3:
-        msg.status.status = 1;
-        break;
-      default:
-        // this is based on literature available on GPS as the number of
-        // types in ROS and MRPT are not same
-        msg.status.status = 0;
+      switch (obj.fix_type)
+      {
+        case GnssFixType::NO_FIX:
+          msg.status.status = -1;
+          break;
+        case GnssFixType::AUTONOMOUS:
+          msg.status.status = 0;
+          break;
+        case GnssFixType::SBAS:
+          msg.status.status = 1;
+          break;
+        case GnssFixType::GBAS:  // NOLINT
+          msg.status.status = 2;
+          break;
+        case GnssFixType::DGPS:
+          msg.status.status = 2;
+          break;
+        case GnssFixType::RTK_FIXED:
+          msg.status.status = 2;
+          break;
+        case GnssFixType::RTK_FLOAT:
+          msg.status.status = 2;
+          break;
+        default:
+          msg.status.status = 0;
+          break;
+      }
     }
-    // this might be incorrect as there is not matching field in mrpt
-    // message type
-    msg.status.service = 1;
-
-    valid = true;
+    else
+    {
+#endif
+      /// following parameter assigned as per
+      /// http://mrpt.ual.es/reference/devel/structmrpt_1_1obs_1_1gnss_1_1_message___n_m_e_a___g_g_a_1_1content__t.html#a33415dc947663d43015605c41b0f66cb
+      /// http://mrpt.ual.es/reference/devel/gnss__messages__ascii__nmea_8h_source.html
+      switch (gga.fields.fix_quality)
+      {
+        case 0:
+          msg.status.status = -1;
+          break;
+        case 1:
+          msg.status.status = 0;
+          break;
+        case 2:
+          msg.status.status = 2;
+          break;
+        case 3:
+          msg.status.status = 0;
+          break;
+        default:
+          // this is based on literature available on GPS as the number of
+          // types in ROS and MRPT are not same
+          msg.status.status = 0;
+      }
+    }
+#if MRPT_VERSION >= 0x020f0b
   }
+  const auto service = static_cast<uint16_t>(obj.gnss_service_mask);
+  msg.status.service = service != 0 ? service : sensor_msgs::msg::NavSatStatus::SERVICE_GPS;
+#else
+  msg.status.service = sensor_msgs::msg::NavSatStatus::SERVICE_GPS;
+#endif
+
+  valid = true;
 
   // cov:
   if (obj.covariance_enu.has_value())
@@ -200,6 +275,10 @@ bool mrpt::ros2bridge::toROS(
 
 bool mrpt::ros2bridge::fromROS(const gps_msgs::msg::GPSFix& msg, mrpt::obs::CObservationGPS& obj)
 {
+#if MRPT_VERSION >= 0x020f0b
+  using mrpt::obs::GnssFixType;
+#endif
+
   // Clear any existing messages
   obj.clear();
 
@@ -228,12 +307,15 @@ bool mrpt::ros2bridge::fromROS(const gps_msgs::msg::GPSFix& msg, mrpt::obs::CObs
     }
 
     // Set UTC time from the GPS time field if available
-    if (msg.time > 0)
+    if (std::isfinite(msg.time) && msg.time > 0 &&
+        msg.time <= static_cast<double>(std::numeric_limits<time_t>::max()))
     {
       // GPSFix.time is seconds since epoch (as float64)
       // Convert to UTC_time structure
       const auto time_t_val = static_cast<time_t>(msg.time);
-      struct tm utc_tm;
+      struct tm utc_tm
+      {
+      };
 #ifdef _WIN32
       gmtime_s(&utc_tm, &time_t_val);
 #else
@@ -247,6 +329,41 @@ bool mrpt::ros2bridge::fromROS(const gps_msgs::msg::GPSFix& msg, mrpt::obs::CObs
 
     obj.setMsg(gga);
   }
+
+#if MRPT_VERSION >= 0x020f0b
+  // Populate rich fix type: GPSFix carries the full status range
+  switch (msg.status.status)
+  {
+    case -1:
+      obj.fix_type = GnssFixType::NO_FIX;
+      break;
+    case 0:
+      obj.fix_type = GnssFixType::AUTONOMOUS;
+      break;
+    case 1:
+      obj.fix_type = GnssFixType::SBAS;
+      break;
+    case 2:
+      obj.fix_type = GnssFixType::GBAS;
+      break;
+    case 18:
+      obj.fix_type = GnssFixType::DGPS;
+      break;
+    case 19:
+      obj.fix_type = GnssFixType::RTK_FIXED;
+      break;
+    case 20:
+      obj.fix_type = GnssFixType::RTK_FLOAT;
+      break;
+    case 33:
+      obj.fix_type = GnssFixType::SBAS;
+      break;  // WAAS
+    default:
+      obj.fix_type = GnssFixType::UNKNOWN;
+      break;
+  }
+    // gnss_service_mask: no SOURCE_* equivalent in gps_msgs/GPSStatus
+#endif
 
   // --- Populate RMC message (speed and track) ---
   if (std::isfinite(msg.speed) || std::isfinite(msg.track))
@@ -275,7 +392,7 @@ bool mrpt::ros2bridge::fromROS(const gps_msgs::msg::GPSFix& msg, mrpt::obs::CObs
     {
       rmc.fields.positioning_mode = 'N';  // Not valid
     }
-    else if (msg.status.status == 18)
+    else if (msg.status.status == 18)  // NOLINTNEXTLINE
     {
       rmc.fields.positioning_mode = 'D';  // Differential
     }
@@ -289,10 +406,13 @@ bool mrpt::ros2bridge::fromROS(const gps_msgs::msg::GPSFix& msg, mrpt::obs::CObs
     }
 
     // Set date/time if available
-    if (msg.time > 0)
+    if (std::isfinite(msg.time) && msg.time > 0 &&
+        msg.time <= static_cast<double>(std::numeric_limits<time_t>::max()))
     {
       const auto time_t_val = static_cast<time_t>(msg.time);
-      struct tm utc_tm;
+      struct tm utc_tm
+      {
+      };
 #ifdef _WIN32
       gmtime_s(&utc_tm, &time_t_val);
 #else
@@ -376,6 +496,10 @@ bool mrpt::ros2bridge::toROS(
     const std_msgs::msg::Header& msg_header,
     gps_msgs::msg::GPSFix& msg)
 {
+#if MRPT_VERSION >= 0x020f0b
+  using mrpt::obs::GnssFixType;
+#endif
+
   // Set header
   msg.header = msg_header;
 
@@ -392,6 +516,51 @@ bool mrpt::ros2bridge::toROS(
 
     // Convert fix_quality to GPSStatus
     msg.status.status = ggaFixQualityToGpsStatus(gga.fields.fix_quality);
+
+    // Convert fix_quality to GPSStatus
+#if MRPT_VERSION >= 0x020f0b
+    if (obj.fix_type != GnssFixType::UNKNOWN)
+    {
+      switch (obj.fix_type)
+      {
+        case GnssFixType::NO_FIX:
+          msg.status.status = -1;
+          break;
+        case GnssFixType::AUTONOMOUS:
+          msg.status.status = 0;
+          break;
+        case GnssFixType::SBAS:
+          msg.status.status = 1;
+          break;
+        case GnssFixType::GBAS:
+          msg.status.status = 2;
+          break;
+        case GnssFixType::DGPS:
+          msg.status.status = 18;
+          break;
+        case GnssFixType::RTK_FIXED:
+          msg.status.status = 19;
+          break;
+        case GnssFixType::RTK_FLOAT:
+          msg.status.status = 20;
+          break;
+        case GnssFixType::DEAD_RECKONING:  // NOLINT
+          msg.status.status = 0;
+          break;
+        default:
+          msg.status.status = 0;
+          break;
+      }
+    }
+    else
+    {
+#endif
+      msg.status.status = ggaFixQualityToGpsStatus(gga.fields.fix_quality);
+
+#if MRPT_VERSION >= 0x020f0b
+    }
+#endif
+
     msg.status.satellites_used = static_cast<uint16_t>(gga.fields.satellitesUsed);
 
     // HDOP
