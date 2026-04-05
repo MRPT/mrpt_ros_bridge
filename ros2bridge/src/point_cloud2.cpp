@@ -585,17 +585,16 @@ bool mrpt::ros2bridge::toROS(
       sensor_msgs::msg::PointField::FLOAT32};
 
   // Helper to skip xyz and color channels:
-  auto remove_xyz = [](std::vector<std::string_view>& vec)
+  auto remove_xyz = [](auto& vec)
   {
     auto it = std::remove_if(
-        vec.begin(), vec.end(),
-        [](const std::string_view& n) { return n == "x" || n == "y" || n == "z"; });
+        vec.begin(), vec.end(), [](const auto& n) { return n == "x" || n == "y" || n == "z"; });
     vec.erase(it, vec.end());
   };
-  auto remove_color = [&](std::vector<std::string_view>& vec)
+  auto remove_color = [&](auto& vec)
   {
-    auto it = std::remove_if(
-        vec.begin(), vec.end(), [&](const std::string_view& n) { return isColorField(n); });
+    auto it =
+        std::remove_if(vec.begin(), vec.end(), [&](const auto& n) { return isColorField(n); });
     vec.erase(it, vec.end());
   };
 
