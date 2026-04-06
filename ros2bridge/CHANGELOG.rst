@@ -2,8 +2,8 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+3.5.1 (2026-04-06)
+------------------
 * Merge pull request `#6 <https://github.com/MRPT/mrpt_ros_bridge/issues/6>`_ from MRPT/fix/new-mrpt-api
   Update to build against mrpt >=2.15.13
 * Update to build against mrpt >=2.15.13 (pointcloud field names as std::string instead of string_view)
