@@ -2,6 +2,16 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Merge pull request `#6 <https://github.com/MRPT/mrpt_ros_bridge/issues/6>`_ from MRPT/fix/new-mrpt-api
+  Update to build against mrpt >=2.15.13
+* Update to build against mrpt >=2.15.13 (pointcloud field names as std::string instead of string_view)
+* Merge pull request `#5 <https://github.com/MRPT/mrpt_ros_bridge/issues/5>`_ from MRPT/feat/new-gps-obs-fields
+  Support new MRPT 2.15.11 GPS data fields
+* Support new MRPT 2.15.11 GPS data fields
+* Contributors: Jose Luis Blanco-Claraco
+
 3.5.0 (2026-02-17)
 ------------------
 * Merge pull request `#4 <https://github.com/MRPT/mrpt_ros_bridge/issues/4>`_ from MRPT/feat/parse-gps-fix
