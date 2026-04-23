@@ -19,11 +19,20 @@
 #include <mrpt/config.h>  // MRPT_IS_BIG_ENDIAN
 
 #include <cstdlib>
+#include <cstring>
 
 using namespace mrpt::maps;
 
 namespace
 {
+template <typename T>
+static inline T unaligned_load(const unsigned char* p)
+{
+  T v;
+  std::memcpy(&v, p, sizeof(T));
+  return v;
+}
+
 bool check_field(
     const sensor_msgs::msg::PointField& input_field,
     std::string check_name,
@@ -58,27 +67,27 @@ void get_float_from_field(
   {
     if (field->datatype == sensor_msgs::msg::PointField::FLOAT32)
     {
-      output = *(reinterpret_cast<const float*>(&data[field->offset]));
+      output = unaligned_load<float>(&data[field->offset]);
     }
     else if (field->datatype == sensor_msgs::msg::PointField::FLOAT64)
     {
-      output = static_cast<float>(*(reinterpret_cast<const double*>(&data[field->offset])));
+      output = static_cast<float>(unaligned_load<double>(&data[field->offset]));
     }
     else if (field->datatype == sensor_msgs::msg::PointField::UINT32)
     {
-      output = static_cast<float>(*(reinterpret_cast<const uint32_t*>(&data[field->offset])));
+      output = static_cast<float>(unaligned_load<uint32_t>(&data[field->offset]));
     }
     else if (field->datatype == sensor_msgs::msg::PointField::INT8)
     {
-      output = static_cast<float>(*(reinterpret_cast<const int8_t*>(&data[field->offset])));
+      output = static_cast<float>(unaligned_load<int8_t>(&data[field->offset]));
     }
     else if (field->datatype == sensor_msgs::msg::PointField::INT16)
     {
-      output = static_cast<float>(*(reinterpret_cast<const int16_t*>(&data[field->offset])));
+      output = static_cast<float>(unaligned_load<int16_t>(&data[field->offset]));
     }
     else if (field->datatype == sensor_msgs::msg::PointField::INT32)
     {
-      output = static_cast<float>(*(reinterpret_cast<const int32_t*>(&data[field->offset])));
+      output = static_cast<float>(unaligned_load<int32_t>(&data[field->offset]));
     }
   }
   else
@@ -94,11 +103,11 @@ void get_double_from_field(
   {
     if (field->datatype == sensor_msgs::msg::PointField::FLOAT32)
     {
-      output = static_cast<double>(*(reinterpret_cast<const float*>(&data[field->offset])));
+      output = static_cast<double>(unaligned_load<float>(&data[field->offset]));
     }
     else if (field->datatype == sensor_msgs::msg::PointField::FLOAT64)
     {
-      output = *(reinterpret_cast<const double*>(&data[field->offset]));
+      output = unaligned_load<double>(&data[field->offset]);
     }
   }
   else
@@ -114,7 +123,7 @@ void get_uint8_from_field(
   {
     if (field->datatype == sensor_msgs::msg::PointField::UINT8)
     {
-      output = *(reinterpret_cast<const uint8_t*>(&data[field->offset]));
+      output = unaligned_load<uint8_t>(&data[field->offset]);
     }
   }
   else
@@ -130,7 +139,7 @@ void get_uint16_from_field(
   {
     if (field->datatype == sensor_msgs::msg::PointField::UINT16)
     {
-      output = *(reinterpret_cast<const uint16_t*>(&data[field->offset]));
+      output = unaligned_load<uint16_t>(&data[field->offset]);
     }
   }
   else
@@ -145,7 +154,7 @@ void get_uint32_from_field(
   {
     if (field->datatype == sensor_msgs::msg::PointField::UINT32)
     {
-      output = *(reinterpret_cast<const uint32_t*>(&data[field->offset]));
+      output = unaligned_load<uint32_t>(&data[field->offset]);
     }
   }
   else
@@ -234,10 +243,8 @@ bool mrpt::ros2bridge::fromROS(const sensor_msgs::msg::PointCloud2& msg, CPoints
     return false;
   }
 
-#if MRPT_VERSION >= 0x20f00  // 2.15.0
   auto* Is = obj.getPointsBufferRef_float_field(CPointsMapXYZI::POINT_FIELD_INTENSITY);
   ASSERT_(Is);
-#endif
 
   for (std::size_t row = 0; row < msg.height; ++row)
   {
@@ -253,11 +260,7 @@ bool mrpt::ros2bridge::fromROS(const sensor_msgs::msg::PointCloud2& msg, CPoints
       get_float_from_field(i_field, msg_data, i);
       obj.insertPoint(x, y, z);
 
-#if MRPT_VERSION >= 0x20f00  // 2.15.0
       Is->push_back(i);
-#else
-      obj.insertPointField_Intensity(i);
-#endif
     }
   }
   return true;
@@ -360,7 +363,6 @@ bool mrpt::ros2bridge::fromROS(const sensor_msgs::msg::PointCloud2& msg, CPoints
   return true;
 }
 
-#if MRPT_VERSION >= 0x20f00  // 2.15.0
 bool mrpt::ros2bridge::fromROS(
     const sensor_msgs::msg::PointCloud2& msg, mrpt::maps::CGenericPointsMap& obj)
 {
@@ -401,7 +403,6 @@ bool mrpt::ros2bridge::fromROS(
     {
       other_fields_uint16[field.name] = &field;
     }
-#if MRPT_VERSION >= 0x020f03  // 2.15.3
     else if (field.datatype == sensor_msgs::msg::PointField::UINT8)
     {
       other_fields_uint8[field.name] = &field;
@@ -410,7 +411,6 @@ bool mrpt::ros2bridge::fromROS(
     {
       other_fields_double[field.name] = &field;
     }
-#endif
     // Then, for float32, and for
     // anything else (very rarely used fields?), we convert into "float"
     else
@@ -436,7 +436,6 @@ bool mrpt::ros2bridge::fromROS(
   {
     obj.registerField_float("t");
   }
-#if MRPT_VERSION >= 0x020f03  // 2.15.3
   for (const auto& [name, _] : other_fields_double)
   {
     obj.registerField_double(name);
@@ -445,7 +444,6 @@ bool mrpt::ros2bridge::fromROS(
   {
     obj.registerField_uint8(name);
   }
-#endif
 
   obj.resize(num_points);
 
@@ -476,7 +474,6 @@ bool mrpt::ros2bridge::fromROS(
         get_uint16_from_field(field_ptr, msg_data, val);
         obj.setPointField_uint16(idx, name, val);
       }
-#if MRPT_VERSION >= 0x020f03  // 2.15.3
       for (const auto& [name, field_ptr] : other_fields_double)
       {
         double val = 0;
@@ -489,7 +486,6 @@ bool mrpt::ros2bridge::fromROS(
         get_uint8_from_field(field_ptr, msg_data, val);
         obj.setPointField_uint8(idx, name, val);
       }
-#endif
 
       if (t_field)
       {
@@ -607,13 +603,11 @@ bool mrpt::ros2bridge::toROS(
   remove_xyz(uint16_fields);
   remove_color(uint16_fields);
 
-#if MRPT_VERSION >= 0x020f03  // 2.15.3
   auto uint8_fields = obj.getPointFieldNames_uint8();
   remove_color(uint8_fields);  // strip color_r/g/b; we handle them via "rgb"
 
   auto double_fields = obj.getPointFieldNames_double();
   remove_color(double_fields);
-#endif
 
   // Append packed "rgb" field if color is available:
   // Declared as FLOAT32 (4 bytes = packed 0x00RRGGBB) per PCL/RViz convention.
@@ -645,7 +639,6 @@ bool mrpt::ros2bridge::toROS(
     point_step += sizeof(uint16_t);
   }
 
-#if MRPT_VERSION >= 0x020f03  // 2.15.3
   // Append uint8 fields (non-color ones):
   for (const auto& u8n : uint8_fields)
   {
@@ -663,7 +656,6 @@ bool mrpt::ros2bridge::toROS(
     datatypes.push_back(sensor_msgs::msg::PointField::FLOAT64);
     point_step += sizeof(double);
   }
-#endif
 
   // ---------------------------------------------------------------
   // Build msg.fields
@@ -703,11 +695,9 @@ bool mrpt::ros2bridge::toROS(
   const mrpt::aligned_std_vector<float>* color_rf_buf = nullptr;
   const mrpt::aligned_std_vector<float>* color_gf_buf = nullptr;
   const mrpt::aligned_std_vector<float>* color_bf_buf = nullptr;
-#if MRPT_VERSION >= 0x020f03
   const mrpt::aligned_std_vector<uint8_t>* color_ru8_buf = nullptr;
   const mrpt::aligned_std_vector<uint8_t>* color_gu8_buf = nullptr;
   const mrpt::aligned_std_vector<uint8_t>* color_bu8_buf = nullptr;
-#endif
 
   if (hasColorF)
   {
@@ -719,7 +709,6 @@ bool mrpt::ros2bridge::toROS(
     ASSERT_EQUAL_(color_gf_buf->size(), N);
     ASSERT_EQUAL_(color_bf_buf->size(), N);
   }
-#if MRPT_VERSION >= 0x020f03
   else if (hasColorU8)
   {
     color_ru8_buf = obj.getPointsBufferRef_uint8_field(CPointsMap::POINT_FIELD_COLOR_Ru8);
@@ -730,7 +719,6 @@ bool mrpt::ros2bridge::toROS(
     ASSERT_EQUAL_(color_gu8_buf->size(), N);
     ASSERT_EQUAL_(color_bu8_buf->size(), N);
   }
-#endif
 
   // Generic float field buffers:
   std::vector<const mrpt::aligned_std_vector<float>*> float_bufs;
@@ -748,17 +736,12 @@ bool mrpt::ros2bridge::toROS(
   uint16_bufs.reserve(uint16_fields.size());
   for (const auto& un : uint16_fields)
   {
-#if MRPT_VERSION >= 0x020f04  // 2.15.4
     const auto* v = obj.getPointsBufferRef_uint16_field(un);
-#else
-    const auto* v = obj.getPointsBufferRef_uint_field(un);
-#endif
     ASSERT_(v);
     ASSERT_EQUAL_(v->size(), N);
     uint16_bufs.push_back(v);
   }
 
-#if MRPT_VERSION >= 0x020f03
   // Generic uint8 field buffers (non-color):
   std::vector<const mrpt::aligned_std_vector<uint8_t>*> uint8_bufs;
   uint8_bufs.reserve(uint8_fields.size());
@@ -780,7 +763,6 @@ bool mrpt::ros2bridge::toROS(
     ASSERT_EQUAL_(v->size(), N);
     double_bufs.push_back(v);
   }
-#endif
 
   // ---------------------------------------------------------------
   // Fill per-point data
@@ -790,10 +772,8 @@ bool mrpt::ros2bridge::toROS(
   // We use direct offset values already stored in offsets[].
   const size_t firstFloatIdx = 3 + (hasAnyColor ? 1 : 0);
   const size_t firstU16Idx = firstFloatIdx + float_fields.size();
-#if MRPT_VERSION >= 0x020f03
   const size_t firstU8Idx = firstU16Idx + uint16_fields.size();
   const size_t firstDblIdx = firstU8Idx + uint8_fields.size();
-#endif
 
   uint8_t* dst = msg.data.data();
   for (size_t i = 0; i < N; ++i)
@@ -814,14 +794,12 @@ bool mrpt::ros2bridge::toROS(
         g = static_cast<uint8_t>(std::min(255.0f, std::max(0.0f, (*color_gf_buf)[i] * 255.0f)));
         b = static_cast<uint8_t>(std::min(255.0f, std::max(0.0f, (*color_bf_buf)[i] * 255.0f)));
       }
-#if MRPT_VERSION >= 0x020f03
       else if (hasColorU8)
       {
         r = (*color_ru8_buf)[i];
         g = (*color_gu8_buf)[i];
         b = (*color_bu8_buf)[i];
       }
-#endif
 
       const uint32_t rgb_packed = (static_cast<uint32_t>(r) << 16) |
                                   (static_cast<uint32_t>(g) << 8) | static_cast<uint32_t>(b);
@@ -840,7 +818,6 @@ bool mrpt::ros2bridge::toROS(
       std::memcpy(dst + offsets[firstU16Idx + ui], &(*uint16_bufs[ui])[i], sizeof(uint16_t));
     }
 
-#if MRPT_VERSION >= 0x020f03
     // Generic uint8 fields (non-color)
     for (size_t u8i = 0; u8i < uint8_bufs.size(); ++u8i)
     {
@@ -852,15 +829,12 @@ bool mrpt::ros2bridge::toROS(
     {
       std::memcpy(dst + offsets[firstDblIdx + di], &(*double_bufs[di])[i], sizeof(double));
     }
-#endif
 
     dst += msg.point_step;
   }
 
   return true;
 }
-
-#endif
 
 bool mrpt::ros2bridge::toROS(
     const CSimplePointsMap& obj,
@@ -904,12 +878,13 @@ bool mrpt::ros2bridge::toROS(
   const auto& ys = obj.getPointsBufferRef_y();
   const auto& zs = obj.getPointsBufferRef_z();
 
-  float* pointDest = reinterpret_cast<float*>(msg.data.data());
+  uint8_t* pointDest = msg.data.data();
   for (size_t i = 0; i < xs.size(); i++)
   {
-    *pointDest++ = xs[i];
-    *pointDest++ = ys[i];
-    *pointDest++ = zs[i];
+    std::memcpy(pointDest + 0 * sizeof(float), &xs[i], sizeof(float));
+    std::memcpy(pointDest + 1 * sizeof(float), &ys[i], sizeof(float));
+    std::memcpy(pointDest + 2 * sizeof(float), &zs[i], sizeof(float));
+    pointDest += msg.point_step;
   }
 
   return true;
@@ -957,20 +932,17 @@ bool mrpt::ros2bridge::toROS(
   const auto& ys = obj.getPointsBufferRef_y();
   const auto& zs = obj.getPointsBufferRef_z();
 
-#if MRPT_VERSION >= 0x20f00  // 2.15.0
   const auto* Is = obj.getPointsBufferRef_float_field(CPointsMapXYZI::POINT_FIELD_INTENSITY);
-#else
-  const auto* Is = obj.getPointsBufferRef_intensity();
-#endif
   ASSERT_(Is);
 
-  float* pointDest = reinterpret_cast<float*>(msg.data.data());
+  uint8_t* pointDest = msg.data.data();
   for (size_t i = 0; i < xs.size(); i++)
   {
-    *pointDest++ = xs[i];
-    *pointDest++ = ys[i];
-    *pointDest++ = zs[i];
-    *pointDest++ = (*Is)[i];
+    std::memcpy(pointDest + 0 * sizeof(float), &xs[i], sizeof(float));
+    std::memcpy(pointDest + 1 * sizeof(float), &ys[i], sizeof(float));
+    std::memcpy(pointDest + 2 * sizeof(float), &zs[i], sizeof(float));
+    std::memcpy(pointDest + 3 * sizeof(float), &(*Is)[i], sizeof(float));
+    pointDest += msg.point_step;
   }
 
   return true;
@@ -993,21 +965,9 @@ bool mrpt::ros2bridge::toROS(
 
   msg.point_step = sizeof(float) * 3;
 
-#if MRPT_VERSION >= 0x20f00  // 2.15.0
   const auto* Is = obj.getPointsBufferRef_float_field(CPointsMapXYZIRT::POINT_FIELD_INTENSITY);
-
-#if MRPT_VERSION >= 0x020f04  // 2.15.4
   const auto* Rs = obj.getPointsBufferRef_uint16_field(CPointsMapXYZIRT::POINT_FIELD_RING_ID);
-#else
-  const auto* Rs = obj.getPointsBufferRef_uint_field(CPointsMapXYZIRT::POINT_FIELD_RING_ID);
-#endif
-
   const auto* Ts = obj.getPointsBufferRef_float_field(CPointsMapXYZIRT::POINT_FIELD_TIMESTAMP);
-#else
-  const auto* Is = obj.getPointsBufferRef_intensity();
-  const auto* Rs = obj.getPointsBufferRef_ring();
-  const auto* Ts = obj.getPointsBufferRef_timestamp();
-#endif
 
   if (obj.hasIntensityField())
   {
