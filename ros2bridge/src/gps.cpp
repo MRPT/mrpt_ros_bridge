@@ -205,6 +205,7 @@ bool mrpt::ros2bridge::toROS(
         case GnssFixType::DGPS:
           msg.status.status = 2;
           break;
+          // NavSatFix has no RTK status codes; GBAS_FIX=2 is the closest available.
         case GnssFixType::RTK_FIXED:
           msg.status.status = 2;
           break;
@@ -217,8 +218,8 @@ bool mrpt::ros2bridge::toROS(
       }
     }
     else
-    {
 #endif
+    {
       /// following parameter assigned as per
       /// http://mrpt.ual.es/reference/devel/structmrpt_1_1obs_1_1gnss_1_1_message___n_m_e_a___g_g_a_1_1content__t.html#a33415dc947663d43015605c41b0f66cb
       /// http://mrpt.ual.es/reference/devel/gnss__messages__ascii__nmea_8h_source.html
@@ -233,17 +234,21 @@ bool mrpt::ros2bridge::toROS(
         case 2:
           msg.status.status = 2;
           break;
-        case 3:
+        case 3:  // NOLINT
           msg.status.status = 0;
           break;
         default:
           // this is based on literature available on GPS as the number of
           // types in ROS and MRPT are not same
           msg.status.status = 0;
+          break;
       }
     }
+
+    valid = true;  // inside the hasMsgClass block: only set when GGA is present
+  }  // end hasMsgClass<GGA>
+
 #if MRPT_VERSION >= 0x020f0b
-  }
   const auto service = static_cast<uint16_t>(obj.gnss_service_mask);
   msg.status.service = service != 0 ? service : sensor_msgs::msg::NavSatStatus::SERVICE_GPS;
 #else
@@ -313,9 +318,7 @@ bool mrpt::ros2bridge::fromROS(const gps_msgs::msg::GPSFix& msg, mrpt::obs::CObs
       // GPSFix.time is seconds since epoch (as float64)
       // Convert to UTC_time structure
       const auto time_t_val = static_cast<time_t>(msg.time);
-      struct tm utc_tm
-      {
-      };
+      struct tm utc_tm{};
 #ifdef _WIN32
       gmtime_s(&utc_tm, &time_t_val);
 #else
@@ -410,9 +413,7 @@ bool mrpt::ros2bridge::fromROS(const gps_msgs::msg::GPSFix& msg, mrpt::obs::CObs
         msg.time <= static_cast<double>(std::numeric_limits<time_t>::max()))
     {
       const auto time_t_val = static_cast<time_t>(msg.time);
-      struct tm utc_tm
-      {
-      };
+      struct tm utc_tm{};
 #ifdef _WIN32
       gmtime_s(&utc_tm, &time_t_val);
 #else
