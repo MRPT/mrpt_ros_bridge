@@ -2,6 +2,14 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Merge pull request `#7 <https://github.com/MRPT/mrpt_ros_bridge/issues/7>`_ from MRPT/fix/gps-nmea-regression
+  Fix/gps nmea regression
+* Add GPS unit tests
+* FIX: Regression in populating GPS ROS2 messages for mrpt>=2.15.11
+* Contributors: Jose Luis Blanco-Claraco
+
 3.5.1 (2026-04-06)
 ------------------
 * Merge pull request `#6 <https://github.com/MRPT/mrpt_ros_bridge/issues/6>`_ from MRPT/fix/new-mrpt-api
