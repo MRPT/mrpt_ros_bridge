@@ -103,10 +103,11 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
 
   ament_add_gtest(test_${PROJECT_NAME}
-    src/map_unittest.cpp
-    src/pointcloud2_unittest.cpp
-    src/pose_unittest.cpp
-    src/time_unittest.cpp
+    test/gps_unittest.cpp
+    test/map_unittest.cpp
+    test/pointcloud2_unittest.cpp
+    test/pose_unittest.cpp
+    test/time_unittest.cpp
   )
 
   if(TARGET test_${PROJECT_NAME})

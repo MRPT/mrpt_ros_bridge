@@ -246,7 +246,7 @@ bool mrpt::ros2bridge::toROS(
     }
 
     valid = true;  // inside the hasMsgClass block: only set when GGA is present
-  }  // end hasMsgClass<GGA>
+  }                // end hasMsgClass<GGA>
 
 #if MRPT_VERSION >= 0x020f0b
   const auto service = static_cast<uint16_t>(obj.gnss_service_mask);
@@ -254,8 +254,6 @@ bool mrpt::ros2bridge::toROS(
 #else
   msg.status.service = sensor_msgs::msg::NavSatStatus::SERVICE_GPS;
 #endif
-
-  valid = true;
 
   // cov:
   if (obj.covariance_enu.has_value())
@@ -318,7 +316,9 @@ bool mrpt::ros2bridge::fromROS(const gps_msgs::msg::GPSFix& msg, mrpt::obs::CObs
       // GPSFix.time is seconds since epoch (as float64)
       // Convert to UTC_time structure
       const auto time_t_val = static_cast<time_t>(msg.time);
-      struct tm utc_tm{};
+      struct tm utc_tm
+      {
+      };
 #ifdef _WIN32
       gmtime_s(&utc_tm, &time_t_val);
 #else
@@ -413,7 +413,9 @@ bool mrpt::ros2bridge::fromROS(const gps_msgs::msg::GPSFix& msg, mrpt::obs::CObs
         msg.time <= static_cast<double>(std::numeric_limits<time_t>::max()))
     {
       const auto time_t_val = static_cast<time_t>(msg.time);
-      struct tm utc_tm{};
+      struct tm utc_tm
+      {
+      };
 #ifdef _WIN32
       gmtime_s(&utc_tm, &time_t_val);
 #else
