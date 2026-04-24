@@ -2,6 +2,13 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Merge pull request `#8 <https://github.com/MRPT/mrpt_ros_bridge/issues/8>`_ from MRPT/fix/potential-ub-reinterpret-cast
+  FIX: Potential UB for reinterpret_cast
+* FIX: Potential UB for reinterpret_cast
+* Contributors: Jose Luis Blanco-Claraco
+
 3.5.2 (2026-04-23)
 ------------------
 * Merge pull request `#7 <https://github.com/MRPT/mrpt_ros_bridge/issues/7>`_ from MRPT/fix/gps-nmea-regression
