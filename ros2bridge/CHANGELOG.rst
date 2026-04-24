@@ -2,8 +2,8 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+3.5.3 (2026-04-24)
+------------------
 * Merge pull request `#8 <https://github.com/MRPT/mrpt_ros_bridge/issues/8>`_ from MRPT/fix/potential-ub-reinterpret-cast
   FIX: Potential UB for reinterpret_cast
 * FIX: Potential UB for reinterpret_cast
