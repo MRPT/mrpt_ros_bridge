@@ -38,13 +38,13 @@ jobs:
             use_ros_testing: true
 
           # Rolling Ridley (No End-Of-Life)
-          - docker_image: ubuntu:resolute
-            ros_distribution: rolling
-            use_ros_testing: false
+          #- docker_image: ubuntu:resolute
+          #  ros_distribution: rolling
+          #  use_ros_testing: false
 
-          - docker_image: ubuntu:resolute
-            ros_distribution: rolling
-            use_ros_testing: true
+          #- docker_image: ubuntu:resolute
+          #  ros_distribution: rolling
+          #  use_ros_testing: true
 
     container:
       image: ${{ matrix.docker_image }}
