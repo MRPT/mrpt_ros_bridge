@@ -166,7 +166,7 @@ bool mrpt::ros1bridge::fromROS(const sensor_msgs::PointCloud2& msg, CPointsMapXY
       get_float_from_field(z_field, msg_data, z);
       get_float_from_field(i_field, msg_data, i);
       obj.insertPoint(x, y, z);
-      obj.insertPointField_Intensity(i);
+      obj.insertPointField_float(mrpt::maps::CPointsMap::POINT_FIELD_INTENSITY, i);
     }
   }
   return true;
@@ -364,7 +364,7 @@ bool mrpt::ros1bridge::toROS(
   const auto& xs = obj.getPointsBufferRef_x();
   const auto& ys = obj.getPointsBufferRef_y();
   const auto& zs = obj.getPointsBufferRef_z();
-  const auto* Is = obj.getPointsBufferRef_intensity();
+  const auto* Is = obj.getPointsBufferRef_float_field(mrpt::maps::CPointsMap::POINT_FIELD_INTENSITY);
 
   float* pointDest = reinterpret_cast<float*>(msg.data.data());
   for (size_t i = 0; i < xs.size(); i++)
@@ -395,21 +395,21 @@ bool mrpt::ros1bridge::toROS(
 
   if (obj.hasIntensityField())
   {
-    ASSERT_EQUAL_(obj.getPointsBufferRef_intensity()->size(), obj.size());
+    ASSERT_EQUAL_(obj.getPointsBufferRef_float_field(mrpt::maps::CPointsMap::POINT_FIELD_INTENSITY)->size(), obj.size());
     names.push_back("intensity");
     offsets.push_back(msg.point_step);
     msg.point_step += sizeof(float);
   }
   if (obj.hasTimeField())
   {
-    ASSERT_EQUAL_(obj.getPointsBufferRef_timestamp()->size(), obj.size());
+    ASSERT_EQUAL_(obj.getPointsBufferRef_float_field(mrpt::maps::CPointsMap::POINT_FIELD_TIMESTAMP)->size(), obj.size());
     names.push_back("time");
     offsets.push_back(msg.point_step);
     msg.point_step += sizeof(float);
   }
   if (obj.hasRingField())
   {
-    ASSERT_EQUAL_(obj.getPointsBufferRef_ring()->size(), obj.size());
+    ASSERT_EQUAL_(obj.getPointsBufferRef_uint16_field(mrpt::maps::CPointsMap::POINT_FIELD_RING_ID)->size(), obj.size());
     names.push_back("ring");
     offsets.push_back(msg.point_step);
     msg.point_step += sizeof(uint16_t);
@@ -441,9 +441,13 @@ bool mrpt::ros1bridge::toROS(
   const auto& xs = obj.getPointsBufferRef_x();
   const auto& ys = obj.getPointsBufferRef_y();
   const auto& zs = obj.getPointsBufferRef_z();
-  const auto& Is = *obj.getPointsBufferRef_intensity();
-  const auto& Rs = *obj.getPointsBufferRef_ring();
-  const auto& Ts = *obj.getPointsBufferRef_timestamp();
+  // MRPT >=2.14 uses generic string-keyed field accessors:
+  const auto& Is =
+      *obj.getPointsBufferRef_float_field(mrpt::maps::CPointsMap::POINT_FIELD_INTENSITY);
+  const auto& Rs =
+      *obj.getPointsBufferRef_uint16_field(mrpt::maps::CPointsMap::POINT_FIELD_RING_ID);
+  const auto& Ts =
+      *obj.getPointsBufferRef_float_field(mrpt::maps::CPointsMap::POINT_FIELD_TIMESTAMP);
 
   uint8_t* pointDest = msg.data.data();
   for (size_t i = 0; i < xs.size(); i++)
