@@ -19,6 +19,7 @@
 #include <cv_bridge/cv_bridge.hpp>
 #endif
 
+#include <mrpt/img/CImage_opencv.h>
 #include <mrpt/ros1bridge/image.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
@@ -37,7 +38,7 @@ mrpt::img::CImage mrpt::ros1bridge::fromROS(const sensor_msgs::Image& i)
 sensor_msgs::Image mrpt::ros1bridge::toROS(
     const mrpt::img::CImage& i, const std_msgs::Header& msg_header)
 {
-  const Mat& cvImg = i.asCvMatRef();
+  const cv::Mat cvImg = mrpt::img::toOpenCVMat(i);
 
   cv_bridge::CvImage img_bridge;
 

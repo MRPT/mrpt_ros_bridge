@@ -19,6 +19,7 @@
 #include <cv_bridge/cv_bridge.hpp>
 #endif
 
+#include <mrpt/img/CImage_opencv.h>
 #include <mrpt/ros1bridge/image.h>
 #include <mrpt/ros1bridge/stereo_image.h>
 #include <sensor_msgs/Image.h>
@@ -37,7 +38,7 @@ bool mrpt::ros1bridge::toROS(
     stereo_msgs::DisparityImage& disparity)
 {
   // left image
-  const Mat& cvImgL = obj.imageLeft.asCvMatRef();
+  const cv::Mat cvImgL = mrpt::img::toOpenCVMat(obj.imageLeft);
 
   cv_bridge::CvImage img_bridge;
   img_bridge = CvImage(left.header, sensor_msgs::image_encodings::BGR8, cvImgL);
@@ -48,7 +49,7 @@ bool mrpt::ros1bridge::toROS(
   left.width = obj.imageLeft.getWidth();
 
   // right image
-  const Mat& cvImgR = obj.imageLeft.asCvMatRef();
+  const cv::Mat cvImgR = mrpt::img::toOpenCVMat(obj.imageRight);
 
   cv_bridge::CvImage img_bridge2;
   img_bridge2 = CvImage(right.header, sensor_msgs::image_encodings::BGR8, cvImgR);
@@ -60,7 +61,7 @@ bool mrpt::ros1bridge::toROS(
 
   if (obj.hasImageDisparity)
   {
-    const Mat& cvImgD = obj.imageDisparity.asCvMatRef();
+    const cv::Mat cvImgD = mrpt::img::toOpenCVMat(obj.imageDisparity);
 
     cv_bridge::CvImage img_bridge3;
     img_bridge3 = CvImage(disparity.header, sensor_msgs::image_encodings::BGR8, cvImgD);

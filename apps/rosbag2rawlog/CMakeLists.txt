@@ -44,4 +44,4 @@ target_compile_definitions(${PROJECT_NAME}
 DeclareAppForInstall(${PROJECT_NAME})
 # Dependencies on MRPT libraries: Just mention the top-level dependency, the rest will be detected automatically,
 #  and all the needed #include<> dirs added (see the script DeclareAppDependencies.cmake for further details)
-DeclareAppDependencies(${PROJECT_NAME} mrpt::system mrpt::obs mrpt::io mrpt::tclap mrpt::serialization)
+DeclareAppDependencies(${PROJECT_NAME} mrpt::mrpt_system mrpt::mrpt_obs mrpt::mrpt_io mrpt::tclap mrpt::mrpt_serialization)

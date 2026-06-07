@@ -51,8 +51,8 @@ mrpt_add_library(
   TARGET ${PROJECT_NAME}
   SOURCES ${LIB_SRCS} ${LIB_PUBLIC_HDRS}
   PUBLIC_LINK_LIBRARIES
-   mrpt::maps
-   mrpt::obs
+   mrpt::mrpt_maps
+   mrpt::mrpt_obs
 #  PRIVATE_LINK_LIBRARIES
 #  CMAKE_DEPENDENCIES
 #   xxx

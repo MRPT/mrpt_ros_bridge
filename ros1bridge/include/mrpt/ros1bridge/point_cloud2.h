@@ -9,9 +9,7 @@
 
 #pragma once
 
-#include <mrpt/maps/CColouredPointsMap.h>
-#include <mrpt/maps/CPointsMapXYZI.h>
-#include <mrpt/maps/CPointsMapXYZIRT.h>
+#include <mrpt/maps/CGenericPointsMap.h>
 #include <mrpt/maps/CSimplePointsMap.h>
 #include <mrpt/obs/CObservationRotatingScan.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -28,26 +26,20 @@ namespace mrpt::ros1bridge
  *  @{ */
 
 /** Convert sensor_msgs/PointCloud2 -> mrpt::slam::CSimplePointsMap
- *  Only (x,y,z) data is converted. To use the intensity channel, see
- * the alternative signature for CPointsMapXYZI.
+ *  Only (x,y,z) data is converted. To use extra channels, see CGenericPointsMap overload.
  * Requires point cloud fields: x,y,z.
- * \return true on sucessful conversion, false on any error.
- * \sa toROS
+ * \return true on successful conversion, false on any error.
  */
 bool fromROS(const sensor_msgs::PointCloud2& msg, mrpt::maps::CSimplePointsMap& obj);
 
-/** \overload For (x,y,z,intensity) channels.
- * Requires point cloud fields: x,y,z,intensity
+/** Convert sensor_msgs/PointCloud2 to mrpt::maps::CGenericPointsMap.
+ * Auto-detects all fields in the message (x,y,z,intensity,ring,time,...).
+ * \return true on successful conversion, false on any error.
  */
-bool fromROS(const sensor_msgs::PointCloud2& msg, mrpt::maps::CPointsMapXYZI& obj);
-
-/** \overload For (x,y,z,intensity,ring,time) channels.
- * Requires point cloud fields: x,y,z,intensity,ring,time
- */
-bool fromROS(const sensor_msgs::PointCloud2& msg, mrpt::maps::CPointsMapXYZIRT& obj);
+bool fromROS(const sensor_msgs::PointCloud2& msg, mrpt::maps::CGenericPointsMap& obj);
 
 /** Convert sensor_msgs/PointCloud2 -> mrpt::obs::CObservationRotatingScan.
- * Requires point cloud fields: x,y,z,intensity,ring
+ * Requires point cloud fields: x,y,z,ring
  */
 bool fromROS(
     const sensor_msgs::PointCloud2& m,
@@ -62,34 +54,19 @@ bool fromROS(
 std::set<std::string> extractFields(const sensor_msgs::PointCloud2& msg);
 
 /** Convert mrpt::slam::CSimplePointsMap -> sensor_msgs/PointCloud2
- * The user must supply the "msg_header" field to be copied into the output
- * message object, since that part does not appear in MRPT classes.
- *
  * Generated sensor_msgs::PointCloud2::channels: `x`, `y`, `z`.
- *
- * \return true on sucessful conversion, false on any error.
- * \sa fromROS
+ * \return true on successful conversion, false on any error.
  */
 bool toROS(
     const mrpt::maps::CSimplePointsMap& obj,
     const std_msgs::Header& msg_header,
     sensor_msgs::PointCloud2& msg);
 
-/** \overload With these fields: `x`, `y`, `z`, `intensity`
- * \return true on sucessful conversion, false on any error.
- * \sa fromROS
- */
-bool toROS(
-    const mrpt::maps::CPointsMapXYZI& obj,
-    const std_msgs::Header& msg_header,
-    sensor_msgs::PointCloud2& msg);
-
-/** \overload With these fields: `x`, `y`, `z`, `intensity`, `ring`, `timestamp`
+/** Convert mrpt::maps::CGenericPointsMap -> sensor_msgs/PointCloud2
  * \return true on successful conversion, false on any error.
- * \sa fromROS
  */
 bool toROS(
-    const mrpt::maps::CPointsMapXYZIRT& obj,
+    const mrpt::maps::CGenericPointsMap& obj,
     const std_msgs::Header& msg_header,
     sensor_msgs::PointCloud2& msg);
 
