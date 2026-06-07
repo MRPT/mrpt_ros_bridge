@@ -17,7 +17,7 @@ find_package(stereo_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
-find_package(cv_bridge REQUIRED)
+find_package(cv_bridge QUIET)
 
 find_package(rosbag2_cpp QUIET)  # optional
 if(rosbag2_cpp_FOUND)
@@ -26,8 +26,9 @@ if(rosbag2_cpp_FOUND)
 endif()
 
 
-# Find MRPT dependency (from mrpt_libmaps)
-find_package(mrpt-maps REQUIRED)
+# Find MRPT dependencies
+find_package(mrpt_maps REQUIRED)
+find_package(mrpt_obs REQUIRED)
 
 # Define the "lib${PROJECT_NAME}.so" shared library
 add_library(${PROJECT_NAME} SHARED
@@ -55,9 +56,9 @@ target_include_directories(${PROJECT_NAME}
 # Link dependencies
 target_link_libraries(${PROJECT_NAME} PUBLIC
   ${rosbag2_cpp_lib}
-  cv_bridge::cv_bridge
   geometry_msgs::geometry_msgs__rosidl_typesupport_cpp
-  mrpt::maps
+  mrpt::mrpt_maps
+  mrpt::mrpt_obs
   nav_msgs::nav_msgs__rosidl_typesupport_cpp
   sensor_msgs::sensor_msgs_library
   gps_msgs::gps_msgs__rosidl_typesupport_cpp
@@ -83,6 +84,7 @@ install(
 
 # Export package information
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
+ament_export_include_directories(include)
 ament_export_dependencies(
   geometry_msgs
   sensor_msgs
@@ -92,9 +94,9 @@ ament_export_dependencies(
   std_msgs
   tf2
   tf2_geometry_msgs
-  cv_bridge
   ${rosbag2_cpp_cmake_dep}
-  mrpt-maps
+  mrpt_maps
+  mrpt_obs
 )
 
 # Unit tests

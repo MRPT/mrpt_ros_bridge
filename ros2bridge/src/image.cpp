@@ -15,55 +15,90 @@
 
 #include <mrpt/ros2bridge/image.h>
 
-#if CV_BRIDGE_VERSION < 0x030400
-#include <cv_bridge/cv_bridge.h>
-#else
-#include <cv_bridge/cv_bridge.hpp>
-#endif
-
+#include <cstring>
 #include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/image.hpp>
+#include <std_msgs/msg/header.hpp>
 
 using namespace mrpt::img;
-using namespace sensor_msgs;
-using namespace cv;
-using namespace cv_bridge;
 
-mrpt::img::CImage mrpt::ros2bridge::fromROS(const sensor_msgs::msg::Image& i)
+mrpt::img::CImage mrpt::ros2bridge::fromROS(const sensor_msgs::msg::Image& msg)
 {
-  return mrpt::img::CImage(cv_bridge::toCvCopy(i, "bgr8").get()->image, mrpt::img::DEEP_COPY);
+  const bool isColor = (msg.encoding != sensor_msgs::image_encodings::MONO8);
+  const int32_t w = static_cast<int32_t>(msg.width);
+  const int32_t h = static_cast<int32_t>(msg.height);
+  const TImageChannels nCh = isColor ? CH_RGB : CH_GRAY;
+
+  mrpt::img::CImage img(w, h, nCh);
+
+  const uint32_t step = msg.step;
+  const uint8_t* src = msg.data.data();
+
+  for (int32_t row = 0; row < h; row++)
+  {
+    const uint8_t* srcRow = src + row * step;
+    if (isColor)
+    {
+      for (int32_t col = 0; col < w; col++)
+      {
+        // ROS image_encodings::BGR8 or RGB8 -> store as-is
+        img.at<uint8_t>(col, row, 0) = srcRow[col * 3 + 0];
+        img.at<uint8_t>(col, row, 1) = srcRow[col * 3 + 1];
+        img.at<uint8_t>(col, row, 2) = srcRow[col * 3 + 2];
+      }
+    }
+    else
+    {
+      for (int32_t col = 0; col < w; col++)
+      {
+        img.at<uint8_t>(col, row, 0) = srcRow[col];
+      }
+    }
+  }
+
+  return img;
 }
 
 sensor_msgs::msg::Image mrpt::ros2bridge::toROS(
-    const mrpt::img::CImage& i, const std_msgs::msg::Header& msg_header)
+    const mrpt::img::CImage& img, const std_msgs::msg::Header& msg_header)
 {
-  const Mat& cvImg = i.asCvMatRef();
-
-  cv_bridge::CvImage img_bridge;
-
   sensor_msgs::msg::Image msg;
-  img_bridge = CvImage(
-      msg.header,
-      i.isColor() ? sensor_msgs::image_encodings::BGR8 : sensor_msgs::image_encodings::MONO8,
-      cvImg);
-
-  img_bridge.toImageMsg(msg);
-
-  msg.encoding = i.isColor() ? "bgr8" : "mono8";
   msg.header = msg_header;
-  msg.height = i.getHeight();
-  msg.width = i.getWidth();
+
+  const int32_t w = img.getWidth();
+  const int32_t h = img.getHeight();
+  const bool isColor = img.isColor();
+  const int32_t nCh = isColor ? 3 : 1;
+
+  msg.height = static_cast<uint32_t>(h);
+  msg.width = static_cast<uint32_t>(w);
+  msg.encoding = isColor ? sensor_msgs::image_encodings::BGR8 : sensor_msgs::image_encodings::MONO8;
+  msg.is_bigendian = 0;
+  msg.step = static_cast<uint32_t>(w * nCh);
+  msg.data.resize(static_cast<size_t>(h) * msg.step);
+
+  uint8_t* dst = msg.data.data();
+
+  for (int32_t row = 0; row < h; row++)
+  {
+    uint8_t* dstRow = dst + row * msg.step;
+    if (isColor)
+    {
+      for (int32_t col = 0; col < w; col++)
+      {
+        dstRow[col * 3 + 0] = img.at<uint8_t>(col, row, 0);
+        dstRow[col * 3 + 1] = img.at<uint8_t>(col, row, 1);
+        dstRow[col * 3 + 2] = img.at<uint8_t>(col, row, 2);
+      }
+    }
+    else
+    {
+      for (int32_t col = 0; col < w; col++)
+      {
+        dstRow[col] = img.at<uint8_t>(col, row, 0);
+      }
+    }
+  }
 
   return msg;
 }
-
-//
-/*
-std_msgs/Header header
-uint32 height
-uint32 width
-string encoding
-uint8 is_bigendian
-uint32 step
-uint8[] data
- */

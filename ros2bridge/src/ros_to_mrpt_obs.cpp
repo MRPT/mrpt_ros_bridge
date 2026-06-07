@@ -32,7 +32,8 @@
 #include <mrpt/system/COutputLogger.h>
 #include <mrpt/version.h>
 
-#if MRPT_VERSION < 0x030000
+// CPointsMapXYZI and CPointsMapXYZIRT were removed in MRPT 3.x
+#if MRPT_VERSION < 0x021400
 #include <mrpt/maps/CPointsMapXYZI.h>
 #include <mrpt/maps/CPointsMapXYZIRT.h>
 #endif

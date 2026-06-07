@@ -34,7 +34,8 @@ class MapHdl
 #ifdef OCCUPANCY_GRIDMAP_CELL_SIZE_8BITS
   int lut_cell_mrpt2ros[0x100] = {};  // lookup table for entry convertion
 #else
-  int lut_cell_mrpt2ros[0xFFFF] = {};  // lookup table for entry convertion
+  int lut_cell_mrpt2ros[0x10000] =
+      {};  // lookup table for entry convertion (0x10000 = 65536 = INT16_MAX-INT16_MIN+1)
 #endif
   int lut_cell_ros2mrpt[101] = {};  // lookup table for entry convertion
 
@@ -61,7 +62,7 @@ class MapHdl
 #else
   int16_t cellMrpt2Ros(int16_t i)
   {
-    return static_cast<int16_t>(lut_cellmrpt2ros[static_cast<int>(i) - INT16_MIN]);
+    return static_cast<int16_t>(lut_cell_mrpt2ros[static_cast<int>(i) - INT16_MIN]);
   }
 #endif
   int8_t cellRos2Mrpt(int8_t i)
