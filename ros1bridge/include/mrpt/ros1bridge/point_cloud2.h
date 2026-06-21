@@ -10,6 +10,7 @@
 #pragma once
 
 #include <mrpt/maps/CColouredPointsMap.h>
+#include <mrpt/maps/CGenericPointsMap.h>
 #include <mrpt/maps/CPointsMapXYZI.h>
 #include <mrpt/maps/CPointsMapXYZIRT.h>
 #include <mrpt/maps/CSimplePointsMap.h>
@@ -45,6 +46,13 @@ bool fromROS(const sensor_msgs::PointCloud2& msg, mrpt::maps::CPointsMapXYZI& ob
  * Requires point cloud fields: x,y,z,intensity,ring,time
  */
 bool fromROS(const sensor_msgs::PointCloud2& msg, mrpt::maps::CPointsMapXYZIRT& obj);
+
+/** \overload For (x,y,z,intensity,ring,time) channels, using the newer,
+ * generic, string-keyed field API (mrpt::maps::CGenericPointsMap), the
+ * recommended replacement for the deprecated CPointsMapXYZIRT/CPointsMapXYZI.
+ * Requires point cloud fields: x,y,z; intensity, ring, and time are optional.
+ */
+bool fromROS(const sensor_msgs::PointCloud2& msg, mrpt::maps::CGenericPointsMap& obj);
 
 /** Convert sensor_msgs/PointCloud2 -> mrpt::obs::CObservationRotatingScan.
  * Requires point cloud fields: x,y,z,intensity,ring
@@ -90,6 +98,16 @@ bool toROS(
  */
 bool toROS(
     const mrpt::maps::CPointsMapXYZIRT& obj,
+    const std_msgs::Header& msg_header,
+    sensor_msgs::PointCloud2& msg);
+
+/** \overload For mrpt::maps::CGenericPointsMap, with these fields (when
+ * present in `obj`): `x`, `y`, `z`, `intensity`, `time`, `ring`.
+ * \return true on successful conversion, false on any error.
+ * \sa fromROS
+ */
+bool toROS(
+    const mrpt::maps::CGenericPointsMap& obj,
     const std_msgs::Header& msg_header,
     sensor_msgs::PointCloud2& msg);
 
