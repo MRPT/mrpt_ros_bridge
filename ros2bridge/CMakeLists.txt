@@ -103,6 +103,7 @@ ament_export_dependencies(
 if(BUILD_TESTING)
   # find GTest and ament_cmake_gtest
   find_package(ament_cmake_gtest REQUIRED)
+  find_package(Eigen3 REQUIRED NO_MODULE)
 
   ament_add_gtest(test_${PROJECT_NAME}
     test/gps_unittest.cpp
@@ -115,6 +116,7 @@ if(BUILD_TESTING)
   if(TARGET test_${PROJECT_NAME})
     target_link_libraries(test_${PROJECT_NAME}
       ${PROJECT_NAME}
+      Eigen3::Eigen
     )
   endif()
 endif()
