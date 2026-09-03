@@ -9,7 +9,6 @@
 
 #pragma once
 
-#include <mrpt/maps/CColouredPointsMap.h>
 #include <mrpt/maps/CSimplePointsMap.h>
 #include <sensor_msgs/PointCloud.h>
 

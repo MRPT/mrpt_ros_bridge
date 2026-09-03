@@ -9,7 +9,6 @@
 
 #pragma once
 
-#include <mrpt/maps/CColouredPointsMap.h>
 #include <mrpt/maps/CGenericPointsMap.h>
 #include <mrpt/maps/CSimplePointsMap.h>
 #include <mrpt/obs/CObservationRotatingScan.h>
