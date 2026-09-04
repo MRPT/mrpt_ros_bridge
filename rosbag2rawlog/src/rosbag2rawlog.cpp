@@ -400,15 +400,18 @@ class Transcriber
     for (auto& sensorNode : config["sensors"].asMap())
     {
       auto sensorName = sensorNode.first.as<std::string>();
-      auto& sensor = sensorNode.second.asMap();
-      const auto sensorType = sensor.at("type").as<std::string>();
+      // mrpt::containers::yaml's map_t is an insertion-order vector, not
+      // associative: lookups need the yaml wrapper's has()/operator[], not
+      // raw map_t::at()/count().
+      const mrpt::containers::yaml sensor(sensorNode.second);
+      const auto sensorType = sensor["type"].as<std::string>();
 
       // Optional: fixed sensorPose (then ignores/don't need "tf" data):
       std::optional<mrpt::poses::CPose3D> fixedSensorPose;
-      if (sensor.count("fixed_sensor_pose") != 0)
+      if (sensor.has("fixed_sensor_pose"))
       {
         fixedSensorPose = mrpt::poses::CPose3D::FromString(
-            "["s + sensor.at("fixed_sensor_pose").as<std::string>() + "]"s);
+            "["s + sensor["fixed_sensor_pose"].as<std::string>() + "]"s);
       }
 #if 0
 			if (sensorType == "CObservation3DRangeScan")
@@ -441,8 +444,8 @@ class Transcriber
           return Obs(v.begin(), v.end());
         };
         // backwards compatible "image_topic". For the future, prefer "topic" for consistency.
-        const auto topicKey = sensor.count("topic") ? "topic" : "image_topic";
-        m_lookup[sensor.at(topicKey).as<std::string>()].emplace_back(callback);
+        const auto topicKey = sensor.has("topic") ? "topic" : "image_topic";
+        m_lookup[sensor[topicKey].as<std::string>()].emplace_back(callback);
       }
       else if (sensorType == "CObservationPointCloud")
       {
@@ -452,7 +455,7 @@ class Transcriber
               sensorName, m, *tfBuffer, cli.base_link_frame, fixedSensorPose);
           return Obs(v.begin(), v.end());
         };
-        m_lookup[sensor.at("topic").as<std::string>()].emplace_back(callback);
+        m_lookup[sensor["topic"].as<std::string>()].emplace_back(callback);
       }
       else if (sensorType == "CObservation2DRangeScan")
       {
@@ -462,7 +465,7 @@ class Transcriber
               sensorName, m, *tfBuffer, cli.base_link_frame, fixedSensorPose);
           return Obs(v.begin(), v.end());
         };
-        m_lookup[sensor.at("topic").as<std::string>()].emplace_back(callback);
+        m_lookup[sensor["topic"].as<std::string>()].emplace_back(callback);
       }
       else if (sensorType == "CObservationRotatingScan")
       {
@@ -472,7 +475,7 @@ class Transcriber
               sensorName, m, *tfBuffer, cli.base_link_frame, fixedSensorPose);
           return Obs(v.begin(), v.end());
         };
-        m_lookup[sensor.at("topic").as<std::string>()].emplace_back(callback);
+        m_lookup[sensor["topic"].as<std::string>()].emplace_back(callback);
       }
       else if (sensorType == "CObservationIMU")
       {
@@ -482,7 +485,7 @@ class Transcriber
               sensorName, m, *tfBuffer, cli.base_link_frame, fixedSensorPose);
           return Obs(v.begin(), v.end());
         };
-        m_lookup[sensor.at("topic").as<std::string>()].emplace_back(callback);
+        m_lookup[sensor["topic"].as<std::string>()].emplace_back(callback);
       }
       else if (sensorType == "CObservationGPS")
       {
@@ -492,7 +495,7 @@ class Transcriber
               sensorName, m, *tfBuffer, cli.base_link_frame, fixedSensorPose);
           return Obs(v.begin(), v.end());
         };
-        m_lookup[sensor.at("topic").as<std::string>()].emplace_back(callback);
+        m_lookup[sensor["topic"].as<std::string>()].emplace_back(callback);
       }
       else if (sensorType == "CObservationOdometry")
       {
@@ -501,13 +504,13 @@ class Transcriber
           auto v = mrpt::ros2bridge::rosbag2ToOdometry(sensorName, m);
           return Obs(v.begin(), v.end());
         };
-        m_lookup[sensor.at("topic").as<std::string>()].emplace_back(callback);
+        m_lookup[sensor["topic"].as<std::string>()].emplace_back(callback);
       }
       else if (sensorType == "GenericObservation")
       {
         auto callback = [=](const rosbag2_storage::SerializedBagMessage& m)
         { return fromGenericMrptObservation(m); };
-        m_lookup[sensor.at("topic").as<std::string>()].emplace_back(callback);
+        m_lookup[sensor["topic"].as<std::string>()].emplace_back(callback);
       }
       else
       {
