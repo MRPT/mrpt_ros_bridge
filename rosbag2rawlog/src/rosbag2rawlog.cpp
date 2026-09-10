@@ -275,6 +275,8 @@ Obs toPointCloud2(
   }
 #endif
 
+#if MRPT_VERSION < 0x020f00  // deprecated per-type maps, gone in MRPT 3.x
+
   if (fields.count("ring") || fields.count("time"))
   {
     // XYZIRT
@@ -312,6 +314,7 @@ Obs toPointCloud2(
       return {ptsObs};
     }
   }
+#endif  // MRPT_VERSION < 0x020f00
 
   {
     // XYZ

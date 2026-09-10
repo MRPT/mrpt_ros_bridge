@@ -33,7 +33,15 @@
 #include <mrpt/poses/CPosePDFGaussian.h>
 #include <mrpt/poses/CPosePDFGaussianInf.h>
 #include <mrpt/ros1bridge/pose.h>
+#if defined(__has_include)
+#if __has_include(<tf2/LinearMath/Matrix3x3.hpp>)
+#include <tf2/LinearMath/Matrix3x3.hpp>
+#else
 #include <tf2/LinearMath/Matrix3x3.h>
+#endif
+#else
+#include <tf2/LinearMath/Matrix3x3.h>
+#endif
 
 // MRPT -> ROS functions:
 

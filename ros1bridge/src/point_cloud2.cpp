@@ -174,6 +174,7 @@ bool mrpt::ros1bridge::fromROS(const sensor_msgs::PointCloud2& msg, CSimplePoint
   return true;
 }
 
+#if MRPT_VERSION < 0x20f00  // deprecated in 2.15.0 by CGenericPointsMap, removed in 3.x
 bool mrpt::ros1bridge::fromROS(const sensor_msgs::PointCloud2& msg, CPointsMapXYZI& obj)
 {
   // Copy point data
@@ -330,6 +331,7 @@ bool mrpt::ros1bridge::fromROS(const sensor_msgs::PointCloud2& msg, CPointsMapXY
 
   return true;
 }
+#endif  // MRPT_VERSION < 0x20f00
 
 #if MRPT_VERSION >= 0x20f00  // 2.15.0
 bool mrpt::ros1bridge::fromROS(
@@ -489,16 +491,14 @@ bool mrpt::ros1bridge::toROS(
 
     // Gather additional registered fields in the generic map:
     // Float fields (including "t" if present) and unsigned integer fields (uint16)
-    std::vector<std::string_view> float_fields;
-    std::vector<std::string_view> uint16_fields;
+    std::vector<std::string> float_fields;
+    std::vector<std::string> uint16_fields;
 
-    // The following two calls assume CGenericPointsMap exposes methods to list
-    // registered fields. Adjust these method names to the actual API if needed.
     float_fields = obj.getPointFieldNames_float();
     uint16_fields = obj.getPointFieldNames_uint16();
 
     // Remove x,y,z from the registered lists if present:
-    auto remove_name = [](std::vector<std::string_view>& vec, const std::string& n)
+    auto remove_name = [](std::vector<std::string>& vec, const std::string& n)
     { vec.erase(std::remove(vec.begin(), vec.end(), n), vec.end()); };
     remove_name(float_fields, "x");
     remove_name(float_fields, "y");
@@ -564,8 +564,8 @@ bool mrpt::ros1bridge::toROS(
     ASSERT_EQUAL_(msg.width, N);
 
     // Prepare pointers to additional fields buffers:
-    std::map<std::string_view, const mrpt::aligned_std_vector<float>*> float_bufs;
-    std::map<std::string_view, const mrpt::aligned_std_vector<uint16_t>*> uint16_bufs;
+    std::map<std::string, const mrpt::aligned_std_vector<float>*> float_bufs;
+    std::map<std::string, const mrpt::aligned_std_vector<uint16_t>*> uint16_bufs;
 
     for (const auto& fn : float_fields)
     {
@@ -576,7 +576,7 @@ bool mrpt::ros1bridge::toROS(
     }
     for (const auto& un : uint16_fields)
     {
-      const auto* v = obj.getPointsBufferRef_uint_field(un);
+      const auto* v = obj.getPointsBufferRef_uint16_field(un);
       ASSERT_(v);
       ASSERT_EQUAL_(v->size(), N);
       uint16_bufs[un] = v;
@@ -667,6 +667,7 @@ bool mrpt::ros1bridge::toROS(
   return true;
 }
 
+#if MRPT_VERSION < 0x20f00  // deprecated in 2.15.0 by CGenericPointsMap, removed in 3.x
 bool mrpt::ros1bridge::toROS(
     const CPointsMapXYZI& obj, const std_msgs::Header& msg_header, sensor_msgs::PointCloud2& msg)
 {
@@ -830,6 +831,7 @@ bool mrpt::ros1bridge::toROS(
 
   return true;
 }
+#endif  // MRPT_VERSION < 0x20f00
 
 /** Convert sensor_msgs/PointCloud2 -> mrpt::obs::CObservationRotatingScan */
 bool mrpt::ros1bridge::fromROS(

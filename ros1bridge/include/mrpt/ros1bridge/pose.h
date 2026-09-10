@@ -16,8 +16,21 @@
 #include <mrpt/math/TPose2D.h>
 #include <mrpt/math/TPose3D.h>
 #include <mrpt/poses/poses_frwds.h>
+// tf2 renamed its LinearMath headers from .h to .hpp; the old names were kept
+// as deprecated shims for a while and are gone in recent distros. Pick whichever
+// this one ships, so a single branch builds on both.
+#if defined(__has_include)
+#if __has_include(<tf2/LinearMath/Matrix3x3.hpp>)
+#include <tf2/LinearMath/Matrix3x3.hpp>
+#include <tf2/LinearMath/Transform.hpp>
+#else
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <tf2/LinearMath/Transform.h>
+#endif
+#else
+#include <tf2/LinearMath/Matrix3x3.h>
+#include <tf2/LinearMath/Transform.h>
+#endif
 
 #include <cstring>  // size_t
 
