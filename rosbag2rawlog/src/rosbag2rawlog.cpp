@@ -17,6 +17,8 @@
 
 // MRPT:
 #include <mrpt/containers/yaml.h>
+#include <mrpt/io/CCompressedOutputStream.h>
+#include <mrpt/maps/CGenericPointsMap.h>
 #include <mrpt/obs/CActionCollection.h>
 #include <mrpt/obs/CActionRobotMovement3D.h>
 #include <mrpt/obs/CObservation2DRangeScan.h>
@@ -40,16 +42,6 @@
 #include <mrpt/system/os.h>
 #include <mrpt/system/progress.h>
 #include <mrpt/version.h>
-
-#if MRPT_VERSION >= 0x20f00  // 2.15.0
-#include <mrpt/maps/CGenericPointsMap.h>
-#endif
-
-#if MRPT_VERSION >= 0x20f07  // 2.15.7
-#include <mrpt/io/CCompressedOutputStream.h>
-#else
-#include <mrpt/io/CFileGZOutputStream.h>
-#endif
 
 #include <CLI/CLI.hpp>
 
@@ -602,11 +594,7 @@ int main(int argc, char** argv)
       return 1;
     }
 
-#if MRPT_VERSION >= 0x20f07  // 2.15.7
     mrpt::io::CCompressedOutputStream fil_out;
-#else
-    mrpt::io::CFileGZOutputStream fil_out;
-#endif
     cout << "Opening for writing: '" << output_rawlog_file << "'...\n";
     if (!fil_out.open(output_rawlog_file))
     {

@@ -27,10 +27,7 @@ bool mrpt::ros2bridge::fromROS(
   obj.aperture = msg.angle_max - msg.angle_min;
   obj.maxRange = msg.range_max;
   obj.sensorPose = pose;
-
-#if MRPT_VERSION >= 0x020f06
   obj.sweepDuration = msg.scan_time;
-#endif
 
   ASSERT_GT_(msg.ranges.size(), 2);
 
@@ -82,15 +79,8 @@ bool mrpt::ros2bridge::toROS(
   msg.angle_min = -0.5f * obj.aperture;
   msg.angle_max = 0.5f * obj.aperture;
   msg.angle_increment = obj.aperture / (nRays_f - 1.0f);
-
-#if MRPT_VERSION >= 0x020f06
   msg.time_increment = obj.sweepDuration / nRays_f;
   msg.scan_time = obj.sweepDuration;
-#else
-  msg.time_increment = 0.0;
-  msg.scan_time = 0.0;
-#endif
-
   msg.range_min = 0.02f;
   msg.range_max = obj.maxRange;
 

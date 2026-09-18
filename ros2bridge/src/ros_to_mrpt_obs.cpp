@@ -32,12 +32,6 @@
 #include <mrpt/system/COutputLogger.h>
 #include <mrpt/version.h>
 
-// CPointsMapXYZI and CPointsMapXYZIRT were removed in MRPT 3.x
-#if MRPT_VERSION < 0x021400
-#include <mrpt/maps/CPointsMapXYZI.h>
-#include <mrpt/maps/CPointsMapXYZIRT.h>
-#endif
-
 #include <algorithm>  // minmax_element
 #include <stdexcept>
 #include <tf2/buffer_core.hpp>
@@ -105,20 +99,14 @@ bool lookupSensorPose(
 // -----------------------------------------------------------------------
 void fixLivoxTimestampsIfNeeded(mrpt::maps::CPointsMap& pts)
 {
-#if MRPT_VERSION >= 0x020f00  // 2.15.0
   auto* pGeneric = dynamic_cast<mrpt::maps::CGenericPointsMap*>(&pts);
   if (!pGeneric)
   {
     return;
   }
 
-#if MRPT_VERSION >= 0x020f03  // 2.15.3
   auto* ts =
       pGeneric->getPointsBufferRef_float_field(mrpt::maps::CPointsMap::POINT_FIELD_TIMESTAMP);
-#else
-  auto* ts =
-      pGeneric->getPointsBufferRef_float_field(mrpt::maps::CPointsMapXYZIRT::POINT_FIELD_TIMESTAMP);
-#endif
 
   if (ts != nullptr && !ts->empty())
   {
@@ -133,9 +121,6 @@ void fixLivoxTimestampsIfNeeded(mrpt::maps::CPointsMap& pts)
       }
     }
   }
-#else
-  (void)pts;  // unused in older MRPT
-#endif
 }
 
 // -----------------------------------------------------------------------
@@ -157,7 +142,6 @@ mrpt::obs::CObservationPointCloud::Ptr pointCloud2ToObservation(
   // If we have anything beyond (x,y,z), use a generic multi-field cloud:
   if (fields.size() > 3)
   {
-#if MRPT_VERSION >= 0x020f00  // 2.15.0
     auto p = mrpt::maps::CGenericPointsMap::Create();
     if (!mrpt::ros2bridge::fromROS(pts, *p))
     {
@@ -168,39 +152,6 @@ mrpt::obs::CObservationPointCloud::Ptr pointCloud2ToObservation(
 
     fixLivoxTimestampsIfNeeded(*p);
     mapPtr = p;
-#else
-    // Fallback for older MRPT without CGenericPointsMap:
-#if MRPT_VERSION >= 0x020b04
-    if (fields.count("ring") || fields.count("time"))
-    {
-      auto p = mrpt::maps::CPointsMapXYZIRT::Create();
-      if (mrpt::ros2bridge::fromROS(pts, *p))
-      {
-        mapPtr = p;
-      }
-    }
-#endif
-    if (!mapPtr && fields.count("intensity"))
-    {
-      auto p = mrpt::maps::CPointsMapXYZI::Create();
-      if (mrpt::ros2bridge::fromROS(pts, *p))
-      {
-        mapPtr = p;
-      }
-    }
-    // Final fallback to simple XYZ:
-    if (!mapPtr)
-    {
-      auto p = mrpt::maps::CSimplePointsMap::Create();
-      if (!mrpt::ros2bridge::fromROS(pts, *p))
-      {
-        throw std::runtime_error(
-            "pointCloud2ToObservation: could not convert PointCloud2 to "
-            "CSimplePointsMap");
-      }
-      mapPtr = p;
-    }
-#endif
   }
   else
   {
