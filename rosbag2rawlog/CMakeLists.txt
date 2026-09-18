@@ -13,8 +13,8 @@ find_package(cv_bridge REQUIRED)
 find_package(mrpt_msgs REQUIRED)
 
 find_package(mrpt_libros_bridge REQUIRED)
-find_package(mrpt-maps REQUIRED)
-message(STATUS "MRPT_VERSION: ${MRPT_VERSION}")
+find_package(mrpt_maps 3.0 REQUIRED)
+find_package(mrpt_containers 3.0 REQUIRED)
 
 if (CMAKE_COMPILER_IS_GNUCXX)
 	add_compile_options(-Wall)
@@ -36,8 +36,8 @@ target_link_libraries(
   ${PROJECT_NAME}
   mrpt_libros_bridge::mrpt_libros_bridge
   CLI11::CLI11
-  mrpt::maps
-  mrpt::containers
+  mrpt::mrpt_maps
+  mrpt::mrpt_containers
   rclcpp::rclcpp
   tf2::tf2
   nav_msgs::nav_msgs__rosidl_typesupport_cpp
