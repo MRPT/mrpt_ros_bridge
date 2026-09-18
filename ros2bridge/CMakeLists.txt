@@ -107,6 +107,7 @@ if(BUILD_TESTING)
 
   ament_add_gtest(test_${PROJECT_NAME}
     test/gps_unittest.cpp
+    test/image_unittest.cpp
     test/map_unittest.cpp
     test/pointcloud2_unittest.cpp
     test/pose_unittest.cpp
