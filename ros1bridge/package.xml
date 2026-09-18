@@ -25,7 +25,8 @@
   <build_depend>tf2</build_depend>
   <build_depend>tf2_geometry_msgs</build_depend>
   <build_depend>cv_bridge</build_depend>
-  <build_depend>mrpt_libapps</build_depend>
+  <build_depend version_gte="3.0.0">mrpt_maps</build_depend>
+  <build_depend version_gte="3.0.0">mrpt_obs</build_depend>
 
   <!-- Execution/runtime dependencies -->
   <exec_depend>geometry_msgs</exec_depend>
@@ -36,7 +37,8 @@
   <exec_depend>tf2</exec_depend>
   <exec_depend>tf2_geometry_msgs</exec_depend>
   <exec_depend>cv_bridge</exec_depend>
-  <exec_depend>mrpt_libapps</exec_depend>
+  <exec_depend version_gte="3.0.0">mrpt_maps</exec_depend>
+  <exec_depend version_gte="3.0.0">mrpt_obs</exec_depend>
 
   <!-- Documentation dependency -->
   <doc_depend>doxygen</doc_depend>

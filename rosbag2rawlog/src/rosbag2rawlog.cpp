@@ -21,6 +21,7 @@
 #include <mrpt/containers/yaml.h>
 #include <mrpt/io/CFileGZInputStream.h>
 #include <mrpt/io/CFileGZOutputStream.h>
+#include <mrpt/maps/CGenericPointsMap.h>
 #include <mrpt/obs/CActionCollection.h>
 #include <mrpt/obs/CActionRobotMovement3D.h>
 #include <mrpt/obs/CObservation2DRangeScan.h>
@@ -41,7 +42,6 @@
 #include <mrpt/system/filesystem.h>
 #include <mrpt/system/os.h>
 #include <mrpt/system/progress.h>
-#include <mrpt/version.h>
 #include <nav_msgs/Odometry.h>
 #include <rosbag/bag.h>  // rosbag_storage C++ lib
 #include <rosbag/view.h>
@@ -57,10 +57,6 @@
 #include <tf2/exceptions.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>  // needed by tf2::fromMsg()
 #include <tf2_msgs/TFMessage.h>
-
-#if MRPT_VERSION >= 0x20f00  // 2.15.0
-#include <mrpt/maps/CGenericPointsMap.h>
-#endif
 
 #include <memory>
 
@@ -260,7 +256,8 @@ Obs toPointCloud2(
     return {};
   }
 
-#if MRPT_VERSION >= 0x020f00  // 2.15.0 introduced CGenericPointsMap
+  // If we have anything beyond (x,y,z), use a generic multi-field cloud:
+  if (fields.size() > 3)
   {
     auto mrptPts = mrpt::maps::CGenericPointsMap::Create();
     ptsObs->pointcloud = mrptPts;
@@ -269,61 +266,16 @@ Obs toPointCloud2(
     {
       THROW_EXCEPTION("Could not convert pointcloud from ROS to CGenericPointsMap");
     }
-
-    // converted ok:
-    return {ptsObs};
   }
-#endif
-
-#if MRPT_VERSION < 0x020f00  // deprecated per-type maps, gone in MRPT 3.x
-
-  if (fields.count("ring") || fields.count("time"))
+  else
   {
-    // XYZIRT
-    auto mrptPts = mrpt::maps::CPointsMapXYZIRT::Create();
-    ptsObs->pointcloud = mrptPts;
-
-    if (!mrpt::ros1bridge::fromROS(*pts, *mrptPts))
-    {
-      THROW_EXCEPTION("Could not convert pointcloud from ROS to CPointsMapXYZIRT");
-    }
-    else
-    {  // converted ok:
-      return {ptsObs};
-    }
-  }
-
-  if (fields.count("intensity"))
-  {
-    // XYZI
-    auto mrptPts = mrpt::maps::CPointsMapXYZI::Create();
-    ptsObs->pointcloud = mrptPts;
-
-    if (!mrpt::ros1bridge::fromROS(*pts, *mrptPts))
-    {
-      thread_local bool warn1st = false;
-      if (!warn1st)
-      {
-        warn1st = true;
-        std::cerr << "Could not convert pointcloud from ROS to "
-                     "CPointsMapXYZI. Trying with XYZ.\n";
-      }
-    }
-    else
-    {  // converted ok:
-      return {ptsObs};
-    }
-  }
-#endif  // MRPT_VERSION < 0x020f00
-
-  {
-    // XYZ
+    // Pure XYZ:
     auto mrptPts = mrpt::maps::CSimplePointsMap::Create();
     ptsObs->pointcloud = mrptPts;
     if (!mrpt::ros1bridge::fromROS(*pts, *mrptPts))
-      THROW_EXCEPTION(
-          "Could not convert pointcloud from ROS to "
-          "CSimplePointsMap");
+    {
+      THROW_EXCEPTION("Could not convert pointcloud from ROS to CSimplePointsMap");
+    }
   }
 
   return {ptsObs};

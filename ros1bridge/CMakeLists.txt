@@ -17,23 +17,20 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
 )
 
-# Find MRPT dependency (from mrpt_libapps)
-find_package(mrpt-apps REQUIRED)
+# Find MRPT dependencies
+find_package(mrpt_maps 3.0 REQUIRED)
+find_package(mrpt_obs 3.0 REQUIRED)
 
 # Define compatibility variables for Catkin (to silence warnings)
-set(mrpt-apps_INCLUDE_DIRS "")
-set(mrpt-apps_LIBRARIES mrpt::apps)
-
-# Tell catkin about MRPT include and library dirs
-set(MRPT_APPS_INCLUDE_DIRS ${mrpt-apps_INCLUDE_DIRS})
-set(MRPT_APPS_LIBRARIES mrpt::apps)
+set(MRPT_INCLUDE_DIRS "")
+set(MRPT_LIBRARIES mrpt::mrpt_maps mrpt::mrpt_obs)
 
 # Define catkin package
 catkin_package(
   INCLUDE_DIRS
     include
-    ${MRPT_APPS_INCLUDE_DIRS}
-  LIBRARIES ${PROJECT_NAME} ${MRPT_APPS_LIBRARIES}
+    ${MRPT_INCLUDE_DIRS}
+  LIBRARIES ${PROJECT_NAME} ${MRPT_LIBRARIES}
   CATKIN_DEPENDS
     geometry_msgs
     sensor_msgs
@@ -44,7 +41,8 @@ catkin_package(
     tf2_geometry_msgs
     cv_bridge
   DEPENDS
-    mrpt-apps
+    mrpt_maps
+    mrpt_obs
 )
 
 # Define the "lib${PROJECT_NAME}.so" shared library
@@ -67,13 +65,13 @@ target_include_directories(${PROJECT_NAME}
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
     ${catkin_INCLUDE_DIRS}
-    ${mrpt-apps_INCLUDE_DIRS}
 )
 
 # Link dependencies
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
-  mrpt::apps
+  mrpt::mrpt_maps
+  mrpt::mrpt_obs
 )
 
 # Installation rules

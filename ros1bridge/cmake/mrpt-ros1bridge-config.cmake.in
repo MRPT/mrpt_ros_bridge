@@ -15,7 +15,8 @@ if(NOT TARGET mrpt::ros1bridge AND TARGET mrpt::mrpt_libros_bridge)
   )
 endif()
 
-# Make sure mrpt-apps is also found:
+# Make sure the MRPT dependencies of our public headers are also found:
 include(CMakeFindDependencyMacro)
 
-find_dependency(mrpt-apps REQUIRED)
+find_dependency(mrpt_maps 3.0 REQUIRED)
+find_dependency(mrpt_obs 3.0 REQUIRED)

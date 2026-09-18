@@ -9,18 +9,11 @@
 
 #pragma once
 
+#include <mrpt/maps/CGenericPointsMap.h>
 #include <mrpt/maps/CSimplePointsMap.h>
 #include <mrpt/obs/CObservationRotatingScan.h>
-#include <mrpt/version.h>
 #include <sensor_msgs/PointCloud2.h>
 
-#if MRPT_VERSION >= 0x20f00  // 2.15.0
-#include <mrpt/maps/CGenericPointsMap.h>
-#else
-#include <mrpt/maps/CColouredPointsMap.h>
-#include <mrpt/maps/CPointsMapXYZI.h>
-#include <mrpt/maps/CPointsMapXYZIRT.h>
-#endif
 #include <set>
 #include <string>
 
@@ -33,27 +26,13 @@ namespace mrpt::ros1bridge
  *  @{ */
 
 /** Convert sensor_msgs/PointCloud2 -> mrpt::slam::CSimplePointsMap
- *  Only (x,y,z) data is converted. To use the intensity channel, see
- * the alternative signature for CPointsMapXYZI.
+ *  Only (x,y,z) data is converted. To use extra channels, see the
+ * CGenericPointsMap overload.
  * Requires point cloud fields: x,y,z.
  * \return true on sucessful conversion, false on any error.
  * \sa toROS
  */
 bool fromROS(const sensor_msgs::PointCloud2& msg, mrpt::maps::CSimplePointsMap& obj);
-
-#if MRPT_VERSION < 0x20f00  // deprecated in 2.15.0 by CGenericPointsMap, removed in 3.x
-
-/** \overload For (x,y,z,intensity) channels.
- * Requires point cloud fields: x,y,z,intensity
- */
-bool fromROS(const sensor_msgs::PointCloud2& msg, mrpt::maps::CPointsMapXYZI& obj);
-
-/** \overload For (x,y,z,intensity,ring,time) channels.
- * Requires point cloud fields: x,y,z,intensity,ring,time
- */
-bool fromROS(const sensor_msgs::PointCloud2& msg, mrpt::maps::CPointsMapXYZIRT& obj);
-
-#endif  // MRPT_VERSION < 0x20f00
 
 /** Convert sensor_msgs/PointCloud2 -> mrpt::obs::CObservationRotatingScan.
  * Requires point cloud fields: x,y,z,intensity,ring
@@ -64,8 +43,6 @@ bool fromROS(
     const mrpt::poses::CPose3D& sensorPoseOnRobot,
     unsigned int num_azimuth_divisions = 360,
     float max_intensity = 1000.0f);
-
-#if MRPT_VERSION >= 0x20f00  // 2.15.0
 
 /** Convert sensor_msgs/PointCloud2 to mrpt::maps::CGenericPointsMap.
  *
@@ -83,8 +60,6 @@ bool fromROS(
  * \return true on successful conversion, false on any error.
  */
 bool fromROS(const sensor_msgs::PointCloud2& msg, mrpt::maps::CGenericPointsMap& obj);
-
-#endif
 
 /** Extract a list of fields found in the point cloud.
  * Typically: {"x","y","z","intensity"}
@@ -105,30 +80,6 @@ bool toROS(
     const std_msgs::Header& msg_header,
     sensor_msgs::PointCloud2& msg);
 
-#if MRPT_VERSION < 0x20f00  // deprecated in 2.15.0 by CGenericPointsMap, removed in 3.x
-
-/** \overload With these fields: `x`, `y`, `z`, `intensity`
- * \return true on sucessful conversion, false on any error.
- * \sa fromROS
- */
-bool toROS(
-    const mrpt::maps::CPointsMapXYZI& obj,
-    const std_msgs::Header& msg_header,
-    sensor_msgs::PointCloud2& msg);
-
-/** \overload With these fields: `x`, `y`, `z`, `intensity`, `ring`, `timestamp`
- * \return true on successful conversion, false on any error.
- * \sa fromROS
- */
-bool toROS(
-    const mrpt::maps::CPointsMapXYZIRT& obj,
-    const std_msgs::Header& msg_header,
-    sensor_msgs::PointCloud2& msg);
-
-#endif  // MRPT_VERSION < 0x20f00
-
-#if MRPT_VERSION >= 0x20f00  // 2.15.0
-
 /** Convert mrpt::maps::CGenericPointsMap with arbitrary per-point-fields to sensor_msgs/PointCloud2
  * \return true on successful conversion, false on any error.
  */
@@ -136,8 +87,6 @@ bool toROS(
     const mrpt::maps::CGenericPointsMap& obj,
     const std_msgs::Header& msg_header,
     sensor_msgs::PointCloud2& msg);
-
-#endif
 
 /** @} */
 /** @} */

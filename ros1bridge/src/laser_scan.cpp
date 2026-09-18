@@ -12,7 +12,6 @@
 #include <mrpt/ros1bridge/laser_scan.h>
 #include <mrpt/ros1bridge/pose.h>
 #include <mrpt/ros1bridge/time.h>
-#include <mrpt/version.h>
 #include <sensor_msgs/LaserScan.h>
 
 bool mrpt::ros1bridge::fromROS(

@@ -23,7 +23,8 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 # Find external dependencies
-find_package(mrpt-apps REQUIRED)
+find_package(mrpt_maps 3.0 REQUIRED)
+find_package(mrpt_containers 3.0 REQUIRED)
 find_package(mrpt-ros1bridge REQUIRED)
 
 # Define the catkin package
@@ -42,7 +43,7 @@ catkin_package(
     mrpt_msgs
     mrpt_libros_bridge
   #DEPENDS
-    #mrpt-apps
+    #mrpt_maps
 )
 
 # Compiler flags
@@ -69,7 +70,8 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
-  mrpt::containers
+  mrpt::mrpt_maps
+  mrpt::mrpt_containers
   mrpt::ros1bridge
 )
 

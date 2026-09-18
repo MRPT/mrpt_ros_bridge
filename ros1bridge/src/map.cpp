@@ -17,7 +17,6 @@
 #include <mrpt/serialization/CArchive.h>
 #include <mrpt/system/filesystem.h>    // for fileExists()
 #include <mrpt/system/string_utils.h>  // for lowerCase()
-#include <mrpt/version.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <ros/console.h>
 

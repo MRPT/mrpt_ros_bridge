@@ -2,7 +2,7 @@
    |                     Mobile Robot Programming Toolkit (MRPT)            |
    |                          https://www.mrpt.org/                         |
    |                                                                        |
-   | Copyright (c) 2005-2024, Individual contributors, see AUTHORS file     |
+   | Copyright (c) 2005-2026, Individual contributors, see AUTHORS file     |
    | See: https://www.mrpt.org/Authors - All rights reserved.               |
    | Released under BSD License. See: https://www.mrpt.org/License          |
    +------------------------------------------------------------------------+ */
@@ -13,22 +13,47 @@
   AUTHOR: Raghavender Sahdev <raghavendersahdev@gmail.com>
   ---------------------------------------------------------------*/
 
-#if CV_BRIDGE_VERSION <= 0x030400
-#include <cv_bridge/cv_bridge.h>
-#else
-#include <cv_bridge/cv_bridge.hpp>
-#endif
-
-#include <mrpt/img/CImage_opencv.h>
 #include <mrpt/ros1bridge/image.h>
 #include <mrpt/ros1bridge/stereo_image.h>
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/image_encodings.h>
 
-using namespace ros;
-using namespace sensor_msgs;
-using namespace cv;
-using namespace cv_bridge;
+#include <cstring>
+
+namespace
+{
+/** stereo_msgs/DisparityImage mandates a 32FC1 image, so the MRPT 8-bit
+ *  disparity image cannot be forwarded through the generic CImage converter.
+ *  Note that MRPT does not define the scale of its disparity values.
+ */
+sensor_msgs::Image disparityToROS(const mrpt::img::CImage& img, const std_msgs::Header& msg_header)
+{
+  sensor_msgs::Image msg;
+  msg.header = msg_header;
+
+  const int32_t w = static_cast<int32_t>(img.getWidth());
+  const int32_t h = static_cast<int32_t>(img.getHeight());
+
+  msg.height = static_cast<uint32_t>(h);
+  msg.width = static_cast<uint32_t>(w);
+  msg.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
+  msg.is_bigendian = 0;
+  msg.step = static_cast<uint32_t>(w * sizeof(float));
+  msg.data.resize(static_cast<size_t>(h) * msg.step);
+
+  for (int32_t row = 0; row < h; row++)
+  {
+    uint8_t* dstRow = msg.data.data() + static_cast<size_t>(row) * msg.step;
+    for (int32_t col = 0; col < w; col++)
+    {
+      const float d = static_cast<float>(img.at<uint8_t>(col, row, 0));
+      std::memcpy(dstRow + col * sizeof(float), &d, sizeof(float));
+    }
+  }
+
+  return msg;
+}
+}  // namespace
 
 bool mrpt::ros1bridge::toROS(
     const mrpt::obs::CObservationStereoImages& obj,
@@ -37,50 +62,13 @@ bool mrpt::ros1bridge::toROS(
     sensor_msgs::Image& right,
     stereo_msgs::DisparityImage& disparity)
 {
-  // left image
-  const cv::Mat cvImgL = mrpt::img::toOpenCVMat(obj.imageLeft);
-
-  cv_bridge::CvImage img_bridge;
-  img_bridge = CvImage(left.header, sensor_msgs::image_encodings::BGR8, cvImgL);
-  img_bridge.toImageMsg(left);
-  left.encoding = "bgr8";
-  left.header = msg_header;
-  left.height = obj.imageLeft.getHeight();
-  left.width = obj.imageLeft.getWidth();
-
-  // right image
-  const cv::Mat cvImgR = mrpt::img::toOpenCVMat(obj.imageRight);
-
-  cv_bridge::CvImage img_bridge2;
-  img_bridge2 = CvImage(right.header, sensor_msgs::image_encodings::BGR8, cvImgR);
-  img_bridge2.toImageMsg(right);
-  right.encoding = "bgr8";
-  right.header = msg_header;
-  right.height = obj.imageRight.getHeight();
-  right.width = obj.imageRight.getWidth();
+  left = mrpt::ros1bridge::toROS(obj.imageLeft, msg_header);
+  right = mrpt::ros1bridge::toROS(obj.imageRight, msg_header);
 
   if (obj.hasImageDisparity)
   {
-    const cv::Mat cvImgD = mrpt::img::toOpenCVMat(obj.imageDisparity);
-
-    cv_bridge::CvImage img_bridge3;
-    img_bridge3 = CvImage(disparity.header, sensor_msgs::image_encodings::BGR8, cvImgD);
-    img_bridge3.toImageMsg(disparity.image);
-    disparity.image.encoding = "bgr8";
-    disparity.image.header = msg_header;
-    disparity.image.height = obj.imageDisparity.getHeight();
-    disparity.image.width = obj.imageDisparity.getWidth();
+    disparity.image = disparityToROS(obj.imageDisparity, msg_header);
   }
+
   return true;
 }
-
-//
-/*
-std_msgs/Header header
-uint32 height
-uint32 width
-string encoding
-uint8 is_bigendian
-uint32 step
-uint8[] data
- */

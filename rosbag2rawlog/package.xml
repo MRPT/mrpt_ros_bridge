@@ -21,6 +21,8 @@
   <depend>std_msgs</depend>
 
   <build_depend>cv_bridge</build_depend>
+  <build_depend version_gte="3.0.0">mrpt_containers</build_depend>
+  <build_depend version_gte="3.0.0">mrpt_maps</build_depend>
   <build_depend>mrpt_libros_bridge</build_depend>
   <build_depend>mrpt_msgs</build_depend>
   <build_depend>nav_msgs</build_depend>
@@ -32,7 +34,8 @@
 
   <!-- Runtime dependencies -->
   <exec_depend>cv_bridge</exec_depend>
-  <exec_depend>mrpt_libapps</exec_depend>
+  <exec_depend version_gte="3.0.0">mrpt_containers</exec_depend>
+  <exec_depend version_gte="3.0.0">mrpt_maps</exec_depend>
   <exec_depend>mrpt_libros_bridge</exec_depend>
   <exec_depend>mrpt_msgs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>

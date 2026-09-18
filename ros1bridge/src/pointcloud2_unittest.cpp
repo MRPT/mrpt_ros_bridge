@@ -15,17 +15,11 @@
  */
 
 #include <gtest/gtest.h>
+#include <mrpt/maps/CGenericPointsMap.h>
 #include <mrpt/maps/CSimplePointsMap.h>
 #include <mrpt/ros1bridge/point_cloud2.h>
-#include <mrpt/version.h>
 
 #include <cstring>
-
-// The per-point-field tests below need CGenericPointsMap, introduced in
-// MRPT 2.15.0; ROS 1 Noetic still builds against older MRPT.
-#if MRPT_VERSION >= 0x20f00
-#include <mrpt/maps/CGenericPointsMap.h>
-#endif
 
 #if HAVE_PCL
 #include <pcl/common/common_headers.h>
@@ -110,8 +104,6 @@ TEST(PointCloud2, toROS)
     EXPECT_TRUE(pt1 == pt2);
   }
 }
-
-#if MRPT_VERSION >= 0x20f00  // CGenericPointsMap
 
 namespace
 {
@@ -233,5 +225,3 @@ TEST(PointCloud2, perPointTimesFloat32Relative)
 
   EXPECT_NEAR(timeSpanOf(pc), 0.09, 1e-4);
 }
-
-#endif  // MRPT_VERSION >= 0x20f00
