@@ -90,9 +90,7 @@ int16_t ggaFixQualityToGpsStatus(uint8_t fix_quality)
 bool mrpt::ros2bridge::fromROS(
     const sensor_msgs::msg::NavSatFix& msg, mrpt::obs::CObservationGPS& obj)
 {
-#if MRPT_VERSION >= 0x020f0b
   using mrpt::obs::GnssFixType;
-#endif
 
   mrpt::obs::gnss::Message_NMEA_GGA gga;
   gga.fields.altitude_meters = msg.altitude;
@@ -103,47 +101,30 @@ bool mrpt::ros2bridge::fromROS(
   {
     case -1:
       gga.fields.fix_quality = 0;
-#if MRPT_VERSION >= 0x020f0b
       obj.fix_type = GnssFixType::NO_FIX;
-#endif
       break;
 
     case 0:
       gga.fields.fix_quality = 1;
-#if MRPT_VERSION >= 0x020f0b
       obj.fix_type = GnssFixType::AUTONOMOUS;
-#endif
       break;
 
-#if MRPT_VERSION < 0x020f0b
-    case 1:  // NOLINT
-#else
     case 1:
-#endif
       gga.fields.fix_quality = 2;
-#if MRPT_VERSION >= 0x020f0b
       obj.fix_type = GnssFixType::SBAS;
-#endif
       break;
 
     case 2:
       gga.fields.fix_quality = 2;
-#if MRPT_VERSION >= 0x020f0b
       obj.fix_type = GnssFixType::GBAS;
-#endif
       break;
     default:
       gga.fields.fix_quality = 0;  // never going to execute default
-#if MRPT_VERSION >= 0x020f0b
       obj.fix_type = GnssFixType::UNKNOWN;
-#endif
   }
   obj.setMsg(gga);
 
-#if MRPT_VERSION >= 0x020f0b
   obj.gnss_service_mask = static_cast<mrpt::obs::GnssService>(msg.status.service);
-#endif
-
   obj.timestamp = mrpt::ros2bridge::fromROS(msg.header.stamp);
 
   if (msg.position_covariance_type != sensor_msgs::msg::NavSatFix::COVARIANCE_TYPE_UNKNOWN)
@@ -166,9 +147,7 @@ bool mrpt::ros2bridge::toROS(
     const std_msgs::msg::Header& msg_header,
     sensor_msgs::msg::NavSatFix& msg)
 {
-#if MRPT_VERSION >= 0x020f0b
   using mrpt::obs::GnssFixType;
-#endif
 
   bool valid = false;
 
@@ -185,7 +164,6 @@ bool mrpt::ros2bridge::toROS(
     msg.latitude = gga.fields.latitude_degrees;
     msg.longitude = gga.fields.longitude_degrees;
 
-#if MRPT_VERSION >= 0x020f0b
     if (obj.fix_type != GnssFixType::UNKNOWN)
     {
       switch (obj.fix_type)
@@ -218,7 +196,6 @@ bool mrpt::ros2bridge::toROS(
       }
     }
     else
-#endif
     {
       /// following parameter assigned as per
       /// http://mrpt.ual.es/reference/devel/structmrpt_1_1obs_1_1gnss_1_1_message___n_m_e_a___g_g_a_1_1content__t.html#a33415dc947663d43015605c41b0f66cb
@@ -248,12 +225,8 @@ bool mrpt::ros2bridge::toROS(
     valid = true;  // inside the hasMsgClass block: only set when GGA is present
   }                // end hasMsgClass<GGA>
 
-#if MRPT_VERSION >= 0x020f0b
   const auto service = static_cast<uint16_t>(obj.gnss_service_mask);
   msg.status.service = service != 0 ? service : sensor_msgs::msg::NavSatStatus::SERVICE_GPS;
-#else
-  msg.status.service = sensor_msgs::msg::NavSatStatus::SERVICE_GPS;
-#endif
 
   // cov:
   if (obj.covariance_enu.has_value())
@@ -278,9 +251,7 @@ bool mrpt::ros2bridge::toROS(
 
 bool mrpt::ros2bridge::fromROS(const gps_msgs::msg::GPSFix& msg, mrpt::obs::CObservationGPS& obj)
 {
-#if MRPT_VERSION >= 0x020f0b
   using mrpt::obs::GnssFixType;
-#endif
 
   // Clear any existing messages
   obj.clear();
@@ -333,7 +304,6 @@ bool mrpt::ros2bridge::fromROS(const gps_msgs::msg::GPSFix& msg, mrpt::obs::CObs
     obj.setMsg(gga);
   }
 
-#if MRPT_VERSION >= 0x020f0b
   // Populate rich fix type: GPSFix carries the full status range
   switch (msg.status.status)
   {
@@ -365,8 +335,7 @@ bool mrpt::ros2bridge::fromROS(const gps_msgs::msg::GPSFix& msg, mrpt::obs::CObs
       obj.fix_type = GnssFixType::UNKNOWN;
       break;
   }
-    // gnss_service_mask: no SOURCE_* equivalent in gps_msgs/GPSStatus
-#endif
+  // gnss_service_mask: no SOURCE_* equivalent in gps_msgs/GPSStatus
 
   // --- Populate RMC message (speed and track) ---
   if (std::isfinite(msg.speed) || std::isfinite(msg.track))
@@ -499,9 +468,7 @@ bool mrpt::ros2bridge::toROS(
     const std_msgs::msg::Header& msg_header,
     gps_msgs::msg::GPSFix& msg)
 {
-#if MRPT_VERSION >= 0x020f0b
   using mrpt::obs::GnssFixType;
-#endif
 
   // Set header
   msg.header = msg_header;
@@ -521,7 +488,6 @@ bool mrpt::ros2bridge::toROS(
     msg.status.status = ggaFixQualityToGpsStatus(gga.fields.fix_quality);
 
     // Convert fix_quality to GPSStatus
-#if MRPT_VERSION >= 0x020f0b
     if (obj.fix_type != GnssFixType::UNKNOWN)
     {
       switch (obj.fix_type)
@@ -557,12 +523,8 @@ bool mrpt::ros2bridge::toROS(
     }
     else
     {
-#endif
       msg.status.status = ggaFixQualityToGpsStatus(gga.fields.fix_quality);
-
-#if MRPT_VERSION >= 0x020f0b
     }
-#endif
 
     msg.status.satellites_used = static_cast<uint16_t>(gga.fields.satellitesUsed);
 

@@ -26,6 +26,7 @@
 #include <mrpt/obs/CObservationPointCloud.h>
 #include <mrpt/obs/CObservationRotatingScan.h>
 #include <mrpt/ros2bridge/gps.h>
+#include <mrpt/ros2bridge/image.h>
 #include <mrpt/ros2bridge/imu.h>
 #include <mrpt/ros2bridge/laser_scan.h>
 #include <mrpt/ros2bridge/point_cloud2.h>
@@ -35,6 +36,7 @@
 #include <mrpt/ros2bridge/time.h>
 #include <mrpt/version.h>
 
+#include <memory>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/serialization.hpp>
 #include <rclcpp/serialized_message.hpp>
@@ -47,14 +49,6 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <tf2/buffer_core.hpp>
 #include <tf2_msgs/msg/tf_message.hpp>
-
-#if CV_BRIDGE_VERSION < 0x030400
-#include <cv_bridge/cv_bridge.h>
-#else
-#include <cv_bridge/cv_bridge.hpp>
-#endif
-
-#include <memory>
 
 namespace mrpt::ros2bridge
 {
@@ -278,8 +272,7 @@ ObsVector rosbag2ToImage(
   imgObs->sensorLabel = sensorLabel;
   imgObs->timestamp = mrpt::ros2bridge::fromROS(image->header.stamp);
 
-  auto cv_ptr = cv_bridge::toCvShare(image);
-  imgObs->image = mrpt::img::CImage(cv_ptr->image, mrpt::img::DEEP_COPY);
+  imgObs->image = mrpt::ros2bridge::fromROS(*image);
 
   // Note: CObservationImage uses cameraPose, not sensorPose:
   if (!lookupSensorPose(

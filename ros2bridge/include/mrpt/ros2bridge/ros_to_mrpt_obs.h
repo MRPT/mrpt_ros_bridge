@@ -91,7 +91,7 @@ void fixLivoxTimestampsIfNeeded(mrpt::maps::CPointsMap& pts);
 /** Convert a PointCloud2 message to CObservationPointCloud.
  *
  *  - Picks the richest available point-map type
- *    (CGenericPointsMap > CPointsMapXYZIRT > CPointsMapXYZI > CSimplePointsMap)
+ *    (CGenericPointsMap > CSimplePointsMap)
  *  - Applies fixLivoxTimestampsIfNeeded() automatically.
  *  - The caller is responsible for filling sensorPose afterwards.
  *
