@@ -1,8 +1,9 @@
 # mrpt_ros_bridge
 [![CI Build ROS2](https://github.com/MRPT/mrpt_ros_bridge/actions/workflows/ros2-build.yml/badge.svg)](https://github.com/MRPT/mrpt_ros_bridge/actions/workflows/ros2-build.yml)
 
-ROS 2 package providing a **C++ bridge between MRPT (Mobile Robot Programming Toolkit)** and the ROS 2 ecosystem.  
+ROS 2 package providing a **C++ bridge between MRPT (Mobile Robot Programming Toolkit)** and the ROS 2 ecosystem.
 It enables seamless conversion between MRPT and ROS message types for maps, sensor data, poses, images, and more.
+Since version v4.0.0 this package requires MRPT>=v3.0.0.
 
 ---
 
