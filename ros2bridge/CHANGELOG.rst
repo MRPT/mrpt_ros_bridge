@@ -2,8 +2,8 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.0.0 (2026-09-19)
+------------------
 * Port to MRPT 3.x API and fix exported CMake config and dependencies accordingly
 * Add unit tests for the ROS <-> MRPT image conversions and pose conversions
 * Fix image conversion bugs (encoding handling, RGB/BGR order, buffer overread)
