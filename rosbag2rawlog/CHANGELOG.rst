@@ -2,6 +2,11 @@
 Changelog for package rosbag2rawlog
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Port to MRPT 3.x API (CMake target names, package.xml, yaml map access) and fix image/stereo conversion bugs found along the way
+* Contributors: Jose Luis Blanco-Claraco
+
 3.5.3 (2026-04-24)
 ------------------
 

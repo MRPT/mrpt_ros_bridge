@@ -2,6 +2,13 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Port to MRPT 3.x API and fix exported CMake config and dependencies accordingly
+* Add unit tests for the ROS <-> MRPT image conversions and pose conversions
+* Fix image conversion bugs (encoding handling, RGB/BGR order, buffer overread)
+* Contributors: Jose Luis Blanco-Claraco
+
 3.5.3 (2026-04-24)
 ------------------
 * Merge pull request `#8 <https://github.com/MRPT/mrpt_ros_bridge/issues/8>`_ from MRPT/fix/potential-ub-reinterpret-cast
