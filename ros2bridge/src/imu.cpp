@@ -14,10 +14,13 @@
   ---------------------------------------------------------------*/
 
 #include <mrpt/ros2bridge/imu.h>
+#include <mrpt/ros2bridge/time.h>
 
 bool mrpt::ros2bridge::fromROS(const sensor_msgs::msg::Imu& msg, mrpt::obs::CObservationIMU& obj)
 {
   using namespace mrpt::obs;
+
+  obj.timestamp = mrpt::ros2bridge::fromROS(msg.header.stamp);
 
   if (msg.orientation_covariance.at(0) >= 0)
   {
