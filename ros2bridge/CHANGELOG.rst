@@ -2,6 +2,18 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Merge pull request `#13 <https://github.com/MRPT/mrpt_ros_bridge/issues/13>`_ from MRPT/fix/imu-timestamp
+  ros2bridge: fromROS(Imu) now copies the message timestamp
+* ros2bridge: fromROS(Imu) now copies the message timestamp
+  Without it, CObservationIMU kept its default timestamp (the wall-clock
+  time of creation), which mismatches all other sensors when replaying
+  bags or using simulated time. This makes it consistent with the
+  NavSatFix, GPSFix and LaserScan converters.
+  Adds unit tests for the IMU converter.
+* Contributors: Jose Luis Blanco-Claraco
+
 4.0.0 (2026-09-19)
 ------------------
 * Port to MRPT 3.x API and fix exported CMake config and dependencies accordingly
