@@ -2,8 +2,8 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.0.1 (2026-10-23)
+------------------
 * Merge pull request `#13 <https://github.com/MRPT/mrpt_ros_bridge/issues/13>`_ from MRPT/fix/imu-timestamp
   ros2bridge: fromROS(Imu) now copies the message timestamp
 * ros2bridge: fromROS(Imu) now copies the message timestamp
