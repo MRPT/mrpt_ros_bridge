@@ -23,9 +23,43 @@
 
 using namespace mrpt::img;
 
+std::optional<mrpt::img::BayerPattern> mrpt::ros2bridge::bayerPatternFromROS(
+    const std::string& encoding)
+{
+  namespace enc = sensor_msgs::image_encodings;
+  if (encoding == enc::BAYER_RGGB8)
+  {
+    return BayerPattern::RGGB;
+  }
+  if (encoding == enc::BAYER_BGGR8)
+  {
+    return BayerPattern::BGGR;
+  }
+  if (encoding == enc::BAYER_GBRG8)
+  {
+    return BayerPattern::GBRG;
+  }
+  if (encoding == enc::BAYER_GRBG8)
+  {
+    return BayerPattern::GRBG;
+  }
+  return std::nullopt;
+}
+
 mrpt::img::CImage mrpt::ros2bridge::fromROS(const sensor_msgs::msg::Image& msg)
 {
   namespace enc = sensor_msgs::image_encodings;
+
+  // Raw 8-bit Bayer mosaics (e.g. machine-vision cameras), demosaiced to RGB:
+  if (const auto pattern = bayerPatternFromROS(msg.encoding); pattern)
+  {
+    ASSERT_GE_(msg.data.size(), static_cast<size_t>(msg.step) * msg.height);
+    mrpt::img::CImage img;
+    img.loadFromBayerBuffer(
+        static_cast<int32_t>(msg.width), static_cast<int32_t>(msg.height), msg.data.data(),
+        msg.step, *pattern);
+    return img;
+  }
 
   // CImage holds 8-bit pixels, with color channels in RGB order:
   uint32_t srcBytesPerPixel = 0;
