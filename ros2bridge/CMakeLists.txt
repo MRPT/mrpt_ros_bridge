@@ -28,7 +28,7 @@ endif()
 
 # Find MRPT dependencies
 find_package(mrpt_maps 3.0 REQUIRED)
-find_package(mrpt_obs 3.0 REQUIRED)
+find_package(mrpt_obs 3.3 REQUIRED)
 
 # Define the "lib${PROJECT_NAME}.so" shared library
 add_library(${PROJECT_NAME} SHARED

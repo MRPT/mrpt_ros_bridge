@@ -145,6 +145,18 @@ TEST(Image, bayer8UniformColor)
   }
 }
 
+TEST(Image, bayerPatternFromROS)
+{
+  using mrpt::img::BayerPattern;
+  namespace enc = sensor_msgs::image_encodings;
+  EXPECT_EQ(mrpt::ros2bridge::bayerPatternFromROS(enc::BAYER_RGGB8), BayerPattern::RGGB);
+  EXPECT_EQ(mrpt::ros2bridge::bayerPatternFromROS(enc::BAYER_BGGR8), BayerPattern::BGGR);
+  EXPECT_EQ(mrpt::ros2bridge::bayerPatternFromROS(enc::BAYER_GBRG8), BayerPattern::GBRG);
+  EXPECT_EQ(mrpt::ros2bridge::bayerPatternFromROS(enc::BAYER_GRBG8), BayerPattern::GRBG);
+  EXPECT_FALSE(mrpt::ros2bridge::bayerPatternFromROS(enc::BAYER_RGGB16).has_value());
+  EXPECT_FALSE(mrpt::ros2bridge::bayerPatternFromROS(enc::MONO8).has_value());
+}
+
 // Unsupported encodings must be rejected instead of being read as if they
 // had three bytes per pixel:
 TEST(Image, rejectsUnsupportedEncoding)

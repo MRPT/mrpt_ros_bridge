@@ -19,7 +19,9 @@
 #include <mrpt/obs/CObservationImage.h>
 
 #include <cstring>  // size_t
+#include <optional>
 #include <sensor_msgs/msg/image.hpp>
+#include <string>
 
 namespace mrpt::ros2bridge
 {
@@ -27,7 +29,13 @@ namespace mrpt::ros2bridge
  * @{ */
 
 /** Makes a deep copy of the image data */
+/** Converts a ROS image into an 8-bit CImage. Raw 8-bit Bayer mosaics
+ *  (bayer_*8) are demosaiced into RGB with CImage::loadFromBayerBuffer(). */
 mrpt::img::CImage fromROS(const sensor_msgs::msg::Image& i);
+
+/** The color filter layout of a raw 8-bit Bayer ROS encoding (bayer_rggb8,
+ *  ...), or nullopt for any other encoding. */
+std::optional<mrpt::img::BayerPattern> bayerPatternFromROS(const std::string& encoding);
 
 /** Makes a deep copy of the image data */
 sensor_msgs::msg::Image toROS(const mrpt::img::CImage& i, const std_msgs::msg::Header& msg_header);
