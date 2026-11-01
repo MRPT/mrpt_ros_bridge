@@ -20,14 +20,18 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@master
+        uses: actions/checkout@v4
 
+      # clang-format-14 is no longer packaged for recent Ubuntu runners, so it
+      # comes from PyPI, in a venv that also holds the linter requirements:
       - name: Install Dependencies
         run: |
-          sudo apt install clang-format-14 -yq
-          pip3 install --user -r .github/python_clang_format_reqs.txt
+          python3 -m venv "$HOME/lint-venv"
+          "$HOME/lint-venv/bin/pip" install -q clang-format==14.0.6 -r .github/python_clang_format_reqs.txt
+          ln -sf "$HOME/lint-venv/bin/clang-format" "$HOME/lint-venv/bin/clang-format-14"
+          echo "$HOME/lint-venv/bin" >> "$GITHUB_PATH"
 
       - name: Check code style
         run: |
-          echo "TASK=lint_all" >> $GITHUB_ENV
+          clang-format-14 --version
           bash .github/check_style.sh
