@@ -102,6 +102,49 @@ TEST(Image, rgba8DropsAlpha)
   EXPECT_EQ(img.at<uint8_t>(0, 0, 2), 30);
 }
 
+// A Bayer mosaic of a uniform color must demosaic to exactly that color on
+// every pixel, borders included, for all four tile layouts:
+TEST(Image, bayer8UniformColor)
+{
+  const uint8_t R = 200;
+  const uint8_t G = 100;
+  const uint8_t B = 50;
+  const struct
+  {
+    const char* encoding;
+    uint8_t tile[4];  // row-major 2x2 tile
+  } cases[] = {
+      {sensor_msgs::image_encodings::BAYER_RGGB8, {R, G, G, B}},
+      {sensor_msgs::image_encodings::BAYER_BGGR8, {B, G, G, R}},
+      {sensor_msgs::image_encodings::BAYER_GRBG8, {G, R, B, G}},
+      {sensor_msgs::image_encodings::BAYER_GBRG8, {G, B, R, G}},
+  };
+  const uint32_t w = 6;
+  const uint32_t h = 4;
+  for (const auto& c : cases)
+  {
+    std::vector<uint8_t> data(w * h);
+    for (uint32_t y = 0; y < h; y++)
+    {
+      for (uint32_t x = 0; x < w; x++)
+      {
+        data[y * w + x] = c.tile[(y % 2) * 2 + (x % 2)];
+      }
+    }
+    const auto img = mrpt::ros2bridge::fromROS(makeImage(c.encoding, w, h, 1, data));
+    ASSERT_TRUE(img.isColor()) << c.encoding;
+    for (int32_t y = 0; y < static_cast<int32_t>(h); y++)
+    {
+      for (int32_t x = 0; x < static_cast<int32_t>(w); x++)
+      {
+        EXPECT_EQ(img.at<uint8_t>(x, y, 0), R) << c.encoding << " at " << x << "," << y;
+        EXPECT_EQ(img.at<uint8_t>(x, y, 1), G) << c.encoding << " at " << x << "," << y;
+        EXPECT_EQ(img.at<uint8_t>(x, y, 2), B) << c.encoding << " at " << x << "," << y;
+      }
+    }
+  }
+}
+
 // Unsupported encodings must be rejected instead of being read as if they
 // had three bytes per pixel:
 TEST(Image, rejectsUnsupportedEncoding)
