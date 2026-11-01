@@ -15,6 +15,7 @@
   <author email="joseluisblancoc@gmail.com">Jose-Luis Blanco-Claraco</author>
 
   <!-- Deps required by user code (they are in public headers) -->
+  <depend version_gte="3.3.0">mrpt_img</depend>
   <depend version_gte="3.3.0">mrpt_obs</depend>
   <depend version_gte="3.0.0">mrpt_maps</depend>
 
