@@ -2,8 +2,8 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.1.0 (2026-11-01)
+------------------
 * fromROS(Image): demosaic 8-bit Bayer images (bayer_rggb8, ...) with CImage::loadFromBayerBuffer() (`#14 <https://github.com/MRPT/mrpt_ros_bridge/issues/14>`_)
 * New bayerPatternFromROS(): ROS Bayer encoding to mrpt::img::BayerPattern
 * Require mrpt_img and mrpt_obs >= 3.3
