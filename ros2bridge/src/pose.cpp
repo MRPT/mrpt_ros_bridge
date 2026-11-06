@@ -31,10 +31,82 @@
 #include <mrpt/poses/CPosePDFGaussianInf.h>
 #include <mrpt/ros2bridge/pose.h>
 
+#include <cmath>
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/pose_with_covariance.hpp>
 #include <geometry_msgs/msg/quaternion.hpp>
 #include <tf2/LinearMath/Matrix3x3.hpp>
+
+namespace
+{
+// Jacobian of the PoseWithCovariance parameters, (x,y,z) plus a small rotation
+// vector about the fixed axes of the parent frame (R = Exp(dtheta) * R0, the
+// convention of tf2::doTransform()), with respect to MRPT (x,y,z,yaw,pitch,roll),
+// R0 = Rz(yaw) * Ry(pitch) * Rx(roll). Each column of the rotation block is
+// the parent-frame axis of one of the three elementary rotations.
+mrpt::math::CMatrixDouble66 jacobian_ros_wrt_ypr(const mrpt::poses::CPose3D& p)
+{
+  const double cy = std::cos(p.yaw());
+  const double sy = std::sin(p.yaw());
+  const double cp = std::cos(p.pitch());
+  const double sp = std::sin(p.pitch());
+
+  mrpt::math::CMatrixDouble66 J;
+  J.setIdentity();
+  // clang-format off
+  J(3, 3) = 0;  J(3, 4) = -sy;  J(3, 5) = cy * cp;
+  J(4, 3) = 0;  J(4, 4) = cy;   J(4, 5) = sy * cp;
+  J(5, 3) = 1;  J(5, 4) = 0;    J(5, 5) = -sp;
+  // clang-format on
+  return J;
+}
+
+// Inverse of jacobian_ros_wrt_ypr(), singular at pitch = +-90 deg (kept finite).
+mrpt::math::CMatrixDouble66 jacobian_ypr_wrt_ros(const mrpt::poses::CPose3D& p)
+{
+  const double cy = std::cos(p.yaw());
+  const double sy = std::sin(p.yaw());
+  constexpr double MIN_COS_PITCH = 1e-9;
+  double cp = std::cos(p.pitch());
+  if (std::abs(cp) < MIN_COS_PITCH)
+  {
+    cp = std::copysign(MIN_COS_PITCH, cp);
+  }
+  const double tp = std::sin(p.pitch()) / cp;
+
+  mrpt::math::CMatrixDouble66 J;
+  J.setIdentity();
+  // clang-format off
+  J(3, 3) = tp * cy;  J(3, 4) = tp * sy;  J(3, 5) = 1;
+  J(4, 3) = -sy;      J(4, 4) = cy;       J(4, 5) = 0;
+  J(5, 3) = cy / cp;  J(5, 4) = sy / cp;  J(5, 5) = 0;
+  // clang-format on
+  return J;
+}
+
+// J * C * J^T
+mrpt::math::CMatrixDouble66 sandwich(
+    const mrpt::math::CMatrixDouble66& J, const mrpt::math::CMatrixDouble66& C)
+{
+  mrpt::math::CMatrixDouble66 R;
+  for (int i = 0; i < 6; i++)
+  {
+    for (int j = 0; j < 6; j++)
+    {
+      double acc = 0;
+      for (int k = 0; k < 6; k++)
+      {
+        for (int l = 0; l < 6; l++)
+        {
+          acc += J(i, k) * C(k, l) * J(j, l);
+        }
+      }
+      R(i, j) = acc;
+    }
+  }
+  return R;
+}
+}  // namespace
 
 // MRPT -> ROS functions:
 tf2::Matrix3x3 mrpt::ros2bridge::toROS(const mrpt::math::CMatrixDouble33& src)
@@ -131,21 +203,19 @@ geometry_msgs::msg::PoseWithCovariance mrpt::ros2bridge::toROS_Pose(
   geometry_msgs::msg::PoseWithCovariance des;
   des.pose = toROS_Pose(src.mean);
 
-  // Read REP103: http://ros.org/reps/rep-0103.html#covariance-representation
-  // # Row-major representation of the 6x6 covariance matrix
-  // # The orientation parameters use a fixed-axis representation.
-  // # In order, the parameters are:
-  // # (x, y, z, rotation about X axis, rotation about Y axis, rotation about
-  // Z axis)
-  // float64[36] covariance
-  // Old comment: "MRPT uses non-fixed axis for 6x6 covariance: should use a
-  // transform Jacobian here!"
-  //           JL ==> Nope! non-fixed z-y-x equals fixed x-y-z rotations.
-
-  // X,Y,Z,YAW,PITCH,ROLL
-  const unsigned int indxs_map[6] = {0, 1, 2, 5, 4, 3};
+  // geometry_msgs/PoseWithCovariance: (x, y, z, rotation about X axis,
+  // rotation about Y axis, rotation about Z axis), the rotations being a small
+  // rotation vector about the fixed axes of the parent frame. MRPT uses
+  // (x,y,z,yaw,pitch,roll): both only coincide for yaw = pitch = 0.
+  const auto J = jacobian_ros_wrt_ypr(src.mean);
+  const mrpt::math::CMatrixDouble66 cov = sandwich(J, src.cov);
   for (int i = 0; i < 6; i++)
-    for (int j = 0; j < 6; j++) des.covariance[indxs_map[i] * 6 + indxs_map[j]] = src.cov(i, j);
+  {
+    for (int j = 0; j < 6; j++)
+    {
+      des.covariance[static_cast<size_t>(i * 6 + j)] = cov(i, j);
+    }
+  }
   return des;
 }
 
@@ -164,10 +234,8 @@ geometry_msgs::msg::PoseWithCovariance mrpt::ros2bridge::toROS(
 
   des.pose = toROS_Pose(src.mean);
 
-  // Read REP103: http://ros.org/reps/rep-0103.html#covariance-representation
-  // Old comment: "MRPT uses non-fixed axis for 6x6 covariance: should use a
-  // transform Jacobian here!"
-  //           JL ==> Nope! non-fixed z-y-x equals fixed x-y-z rotations.
+  // A planar pose only rotates about the parent Z axis, so its yaw is exactly
+  // the "rotation about Z axis" parameter of the message.
 
   // geometry_msgs/PoseWithCovariance msg stores the covariance matrix in
   // row-major representation
@@ -244,10 +312,16 @@ mrpt::poses::CPose3DPDFGaussian mrpt::ros2bridge::fromROS(
 
   des.mean = fromROS(src.pose);
 
-  const unsigned int indxs_map[6] = {0, 1, 2, 5, 4, 3};
-
+  // See toROS_Pose(): from parent-frame rotation vectors to yaw/pitch/roll.
+  mrpt::math::CMatrixDouble66 cov;
   for (int i = 0; i < 6; i++)
-    for (int j = 0; j < 6; j++) des.cov(i, j) = src.covariance[indxs_map[i] * 6 + indxs_map[j]];
+  {
+    for (int j = 0; j < 6; j++)
+    {
+      cov(i, j) = src.covariance[static_cast<size_t>(i * 6 + j)];
+    }
+  }
+  des.cov = sandwich(jacobian_ypr_wrt_ros(des.mean), cov);
 
   return des;
 }
