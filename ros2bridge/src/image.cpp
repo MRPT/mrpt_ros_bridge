@@ -14,7 +14,12 @@
   ---------------------------------------------------------------*/
 
 #include <mrpt/core/exceptions.h>
+#include <mrpt/core/format.h>
+#include <mrpt/io/CMemoryStream.h>
+#include <mrpt/io/vector_loadsave.h>
 #include <mrpt/ros2bridge/image.h>
+#include <mrpt/system/filesystem.h>
+#include <mrpt/system/string_utils.h>
 
 #include <cstring>
 #include <sensor_msgs/image_encodings.hpp>
@@ -181,4 +186,61 @@ sensor_msgs::msg::Image mrpt::ros2bridge::toROS(
   }
 
   return msg;
+}
+
+namespace
+{
+// Format string of a CompressedImage, from a file name, or empty if the file is
+// neither a JPEG nor a PNG.
+std::string compressedFormatFromFileName(const std::string& fileName)
+{
+  const auto ext = mrpt::system::lowerCase(mrpt::system::extractFileExtension(fileName));
+  if (ext == "jpg" || ext == "jpeg")
+  {
+    return "jpeg";
+  }
+  if (ext == "png")
+  {
+    return "png";
+  }
+  return {};
+}
+}  // namespace
+
+sensor_msgs::msg::CompressedImage mrpt::ros2bridge::toROS_Compressed(
+    const mrpt::img::CImage& img, const std_msgs::msg::Header& msg_header, int jpeg_quality)
+{
+  sensor_msgs::msg::CompressedImage msg;
+  msg.header = msg_header;
+
+  if (img.isExternallyStored())
+  {
+    const std::string file = img.getExternalStorageFileAbsolutePath();
+    const std::string format = compressedFormatFromFileName(file);
+    if (!format.empty())
+    {
+      ASSERTMSG_(
+          mrpt::io::loadBinaryFile(msg.data, file),
+          mrpt::format("Cannot read external image file: '%s'", file.c_str()));
+      msg.format = format;
+      return msg;
+    }
+  }
+
+  mrpt::io::CMemoryStream buf;
+  img.saveToStreamAsJPEG(buf, jpeg_quality);
+  const auto* p = static_cast<const uint8_t*>(buf.getRawBufferData());
+  msg.data.assign(p, p + buf.getTotalBytesCount());
+  msg.format = "jpeg";
+  return msg;
+}
+
+mrpt::img::CImage mrpt::ros2bridge::fromROS(const sensor_msgs::msg::CompressedImage& i)
+{
+  mrpt::img::CImage img;
+  if (!img.loadFromEncodedBuffer(i.data.data(), i.data.size()))
+  {
+    img.clear();
+  }
+  return img;
 }

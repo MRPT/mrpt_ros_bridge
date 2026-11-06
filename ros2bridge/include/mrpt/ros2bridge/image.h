@@ -20,6 +20,7 @@
 
 #include <cstring>  // size_t
 #include <optional>
+#include <sensor_msgs/msg/compressed_image.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <string>
 
@@ -39,6 +40,18 @@ std::optional<mrpt::img::BayerPattern> bayerPatternFromROS(const std::string& en
 
 /** Makes a deep copy of the image data */
 sensor_msgs::msg::Image toROS(const mrpt::img::CImage& i, const std_msgs::msg::Header& msg_header);
+
+/** MRPT->ROS: an image as sensor_msgs/CompressedImage.
+ *  Externally stored JPEG or PNG images are copied byte by byte from their file, without
+ *  decoding nor re-encoding them. Any other image is encoded as JPEG with the given quality.
+ */
+sensor_msgs::msg::CompressedImage toROS_Compressed(
+    const mrpt::img::CImage& i, const std_msgs::msg::Header& msg_header, int jpeg_quality = 95);
+
+/** ROS->MRPT: decodes a sensor_msgs/CompressedImage (JPEG or PNG).
+ *  eturn An empty image on decoding errors.
+ */
+mrpt::img::CImage fromROS(const sensor_msgs::msg::CompressedImage& i);
 /** @} */
 
 }  // namespace mrpt::ros2bridge

@@ -214,6 +214,11 @@ bool mrpt::ros2bridge::toROS(
         case 3:  // NOLINT
           msg.status.status = 0;
           break;
+        case 4:  // RTK fixed
+        case 5:  // RTK float
+          // NavSatFix has no RTK status codes; GBAS_FIX=2 is the closest available.
+          msg.status.status = 2;
+          break;
         default:
           // this is based on literature available on GPS as the number of
           // types in ROS and MRPT are not same

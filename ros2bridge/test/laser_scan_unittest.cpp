@@ -100,3 +100,33 @@ TEST(LaserScanConversions, fromROS_invalid_ranges)
     EXPECT_EQ(obs.getScanRangeValidity(i), expectedValid[i]) << "ray " << i;
   }
 }
+
+TEST(LaserScanConversions, toROS_validity_direction_intensity)
+{
+  mrpt::obs::CObservation2DRangeScan obs;
+  obs.aperture = static_cast<float>(M_PI);
+  obs.maxRange = 30.0f;
+  obs.resizeScan(4);
+  obs.setScanHasIntensity(true);
+  for (size_t i = 0; i < 4; i++)
+  {
+    obs.setScanRange(i, 1.0f + static_cast<float>(i));
+    obs.setScanRangeValidity(i, i != 1);
+    obs.setScanIntensity(i, static_cast<int>(10 * i));
+  }
+
+  sensor_msgs::msg::LaserScan msg;
+  ASSERT_TRUE(mrpt::ros2bridge::toROS(obs, msg));
+  ASSERT_EQ(msg.ranges.size(), 4u);
+  ASSERT_EQ(msg.intensities.size(), 4u);
+  EXPECT_EQ(msg.ranges[0], 1.0f);
+  EXPECT_TRUE(std::isinf(msg.ranges[1]));
+  EXPECT_EQ(msg.intensities[3], 30.0f);
+
+  // Clockwise MRPT scans are reversed, so ROS rays still go counterclockwise:
+  obs.rightToLeft = false;
+  ASSERT_TRUE(mrpt::ros2bridge::toROS(obs, msg));
+  EXPECT_EQ(msg.ranges[0], 4.0f);
+  EXPECT_TRUE(std::isinf(msg.ranges[2]));
+  EXPECT_EQ(msg.intensities[0], 30.0f);
+}
