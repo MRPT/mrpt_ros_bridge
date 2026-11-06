@@ -72,6 +72,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <map>
@@ -443,8 +444,22 @@ class Converter
   // ------------------------------------------------------------------
   //  Pass 2
   // ------------------------------------------------------------------
+  // True if `path` is `dir` or is inside it.
+  static bool isInside(const std::string& path, const std::string& dir)
+  {
+    const auto p = std::filesystem::weakly_canonical(path);
+    const auto d = std::filesystem::weakly_canonical(dir);
+    const auto rel = p.lexically_relative(d);
+    return !rel.empty() && *rel.begin() != "..";
+  }
+
   void openWriter()
   {
+    ASSERTMSG_(
+        !isInside(cli_.input_file, cli_.output_dir) &&
+            !isInside(mrpt::img::CImage::getImagesPathBase(), cli_.output_dir),
+        "The output directory must not contain the input rawlog nor its external files.");
+
     if (mrpt::system::directoryExists(cli_.output_dir))
     {
       ASSERTMSG_(
@@ -529,11 +544,14 @@ class Converter
     }
   }
 
+  /// \param projTx The P[3] term of CameraInfo: -fx * baseline for the right camera of a
+  /// stereo pair, zero otherwise.
   void writeImage(
       const mrpt::img::CImage& img,
       const mrpt::img::TCamera& cam,
       const std::string& ns,
-      const std_msgs::msg::Header& h)
+      const std_msgs::msg::Header& h,
+      double projTx = 0)
   {
     if (cli_.image_mode == "compressed")
     {
@@ -545,7 +563,9 @@ class Converter
     {
       write(mrpt::ros2bridge::toROS(img, h), ns + "/image_raw", h.stamp);
     }
-    write(mrpt::ros2bridge::toROS(cam, h), ns + "/camera_info", h.stamp);
+    auto ci = mrpt::ros2bridge::toROS(cam, h);
+    ci.p[3] = projTx;
+    write(ci, ns + "/camera_info", h.stamp);
     img.unload();  // free memory of externally-stored images
   }
 
@@ -558,6 +578,26 @@ class Converter
     {
       return;
     }
+
+    // Externally stored data (e.g. point clouds) must be loaded before converting it. Images
+    // are excluded: their files are copied without decoding them.
+    const bool isImage = dynamic_cast<const CObservationImage*>(&o) != nullptr ||
+                         dynamic_cast<const CObservationStereoImages*>(&o) != nullptr;
+    if (!isImage)
+    {
+      o.load();
+    }
+    writeObservationContents(o, out);
+    if (!isImage)
+    {
+      o.unload();
+    }
+  }
+
+  void writeObservationContents(const mrpt::obs::CObservation& o, const SensorOutput& out)
+  {
+    using namespace mrpt::obs;
+
     const auto h = headerOf(o, out.frame_id);
 
     if (const auto* c = dynamic_cast<const CObservationComment*>(&o); c)
@@ -601,7 +641,7 @@ class Converter
       {
         writeImage(
             st->imageRight, st->rightCamera, out.ns + "/right",
-            headerOf(o, out.frame_id + "_right"));
+            headerOf(o, out.frame_id + "_right"), -st->rightCamera.fx() * st->rightCameraPose.x());
       }
     }
     else if (const auto* pc = dynamic_cast<const CObservationPointCloud*>(&o); pc)

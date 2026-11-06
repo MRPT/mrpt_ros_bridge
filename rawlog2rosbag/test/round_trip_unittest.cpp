@@ -20,6 +20,8 @@
 #include <mrpt/obs/CObservationIMU.h>
 #include <mrpt/obs/CObservationImage.h>
 #include <mrpt/obs/CObservationOdometry.h>
+#include <mrpt/obs/CObservationPointCloud.h>
+#include <mrpt/obs/CObservationStereoImages.h>
 #include <mrpt/obs/CSensoryFrame.h>
 #include <mrpt/ros2bridge/camera_info.h>
 #include <mrpt/ros2bridge/laser_scan.h>
@@ -28,6 +30,7 @@
 #include <mrpt/system/filesystem.h>
 
 #include <cstdlib>
+#include <fstream>
 #include <map>
 #include <nav_msgs/msg/odometry.hpp>
 #include <optional>
@@ -38,6 +41,7 @@
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <tf2_msgs/msg/tf_message.hpp>
 
@@ -144,6 +148,30 @@ struct Fixture
     cam->image.setExternalStorage(imageFile);
     arch << *cam;
 
+    // A point cloud stored in an external text file:
+    {
+      std::ofstream pts(imagesDir + "/points.txt");
+      pts << "1 2 3\n4 5 6\n7 8 9\n";
+    }
+    auto pc = mrpt::obs::CObservationPointCloud::Create();
+    pc->sensorLabel = "LIDAR";
+    pc->timestamp = mrpt::Clock::fromDouble(T0 + 0.35);
+    pc->setAsExternalStorage(
+        "points.txt", mrpt::obs::CObservationPointCloud::ExternalStorageFormat::PlainTextFile);
+    arch << *pc;
+
+    // A stereo pair with a 0.12 m baseline:
+    auto stereo = mrpt::obs::CObservationStereoImages::Create();
+    stereo->sensorLabel = "STEREO";
+    stereo->timestamp = mrpt::Clock::fromDouble(T0 + 0.36);
+    stereo->imageLeft = mrpt::img::CImage(16, 8, mrpt::img::CH_GRAY);
+    stereo->imageRight = mrpt::img::CImage(16, 8, mrpt::img::CH_GRAY);
+    stereo->hasImageRight = true;
+    stereo->leftCamera.setIntrinsicParamsFromValues(10, 10, 8, 4);
+    stereo->rightCamera.setIntrinsicParamsFromValues(10, 10, 8, 4);
+    stereo->rightCameraPose = mrpt::poses::CPose3DQuat(mrpt::poses::CPose3D(0.12, 0, 0, 0, 0, 0));
+    arch << *stereo;
+
     auto odo = mrpt::obs::CObservationOdometry::Create();
     odo->sensorLabel = "ODOMETRY";
     odo->timestamp = mrpt::Clock::fromDouble(T0 + 0.4);
@@ -222,6 +250,18 @@ TEST(rawlog2rosbag, RoundTrip)
       EXPECT_DOUBLE_EQ(cam.fy(), 11.0);
       EXPECT_DOUBLE_EQ(cam.k1(), -0.3);
     }
+    else if (m->topic_name == "/lidar/points")
+    {
+      EXPECT_EQ(deserialize<sensor_msgs::msg::PointCloud2>(*m).width, 3u);
+    }
+    else if (m->topic_name == "/stereo/right/camera_info")
+    {
+      EXPECT_NEAR(deserialize<sensor_msgs::msg::CameraInfo>(*m).p[3], -10.0 * 0.12, 1e-9);
+    }
+    else if (m->topic_name == "/stereo/left/camera_info")
+    {
+      EXPECT_EQ(deserialize<sensor_msgs::msg::CameraInfo>(*m).p[3], 0.0);
+    }
     else if (m->topic_name == "/rawlog_comment")
     {
       EXPECT_EQ(deserialize<std_msgs::msg::String>(*m).data, "dataset notes");
@@ -250,6 +290,22 @@ TEST(rawlog2rosbag, RoundTrip)
   EXPECT_EQ(counts["/odometry/odom"], 1u);
   EXPECT_EQ(counts["/tf"], 1u);
   EXPECT_EQ(counts["/rawlog_comment"], 1u);
+  EXPECT_EQ(counts["/lidar/points"], 1u);
+  EXPECT_EQ(counts["/stereo/left/image_raw/compressed"], 1u);
+  EXPECT_EQ(counts["/stereo/right/camera_info"], 1u);
+}
+
+// An output directory holding the input data must be rejected, not wiped with --overwrite.
+TEST(rawlog2rosbag, RejectsOutputContainingInput)
+{
+  const char* exe = std::getenv("RAWLOG2ROSBAG_EXE");
+  ASSERT_NE(exe, nullptr);
+
+  Fixture fx;
+  const std::string cmd = std::string(exe) + " -i " + fx.rawlog + " -o " + fx.dir + " -w";
+  EXPECT_NE(std::system(cmd.c_str()), 0) << cmd;
+  EXPECT_TRUE(mrpt::system::fileExists(fx.rawlog));
+  EXPECT_TRUE(mrpt::system::fileExists(fx.imagesDir + "/" + fx.imageFile));
 }
 
 // SensoryFrame-based rawlogs: the actions become an integrated /odom topic (+ /tf).
