@@ -110,6 +110,7 @@ if(BUILD_TESTING)
     test/gps_unittest.cpp
     test/image_unittest.cpp
     test/imu_unittest.cpp
+    test/laser_scan_unittest.cpp
     test/map_unittest.cpp
     test/pointcloud2_unittest.cpp
     test/pose_unittest.cpp

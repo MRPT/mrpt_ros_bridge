@@ -26,35 +26,23 @@ bool mrpt::ros2bridge::fromROS(
   obj.sensorLabel = msg.header.frame_id;
   obj.aperture = msg.angle_max - msg.angle_min;
   obj.maxRange = msg.range_max;
-  obj.sensorPose = pose;
   obj.sweepDuration = msg.scan_time;
+
+  // ROS rays go from angle_min to angle_max, MRPT ones from -FOV/2 to +FOV/2:
+  // the sensor pose is rotated by the central angle so that ray i is the same
+  // physical ray in both, also for scans not centered on the sensor +X axis.
+  const double centerAngle = 0.5 * (static_cast<double>(msg.angle_min) + msg.angle_max);
+  obj.sensorPose = pose + mrpt::poses::CPose3D::FromYawPitchRoll(centerAngle, 0, 0);
 
   ASSERT_GT_(msg.ranges.size(), 2);
 
   const size_t N = msg.ranges.size();
-  const auto N_f = static_cast<float>(N);
-  const float ang_step = obj.aperture / (N_f - 1);
-  const float fov05 = 0.5f * obj.aperture;
-  const float inv_ang_step = (N_f - 1) / obj.aperture;
 
   obj.resizeScan(N);
   for (std::size_t i_mrpt = 0; i_mrpt < N; i_mrpt++)
   {
-    // ROS indices go from msg.angle_min to msg.angle_max, while
-    // in MRPT they go from -FOV/2 to +FOV/2.
-    auto i_ros = static_cast<int>(
-        inv_ang_step * (-fov05 - msg.angle_min + ang_step * static_cast<float>(i_mrpt)));
-    if (i_ros < 0)
-    {
-      i_ros += static_cast<int>(N);
-    }
-    else if (i_ros >= static_cast<int>(N))
-    {
-      i_ros -= static_cast<int>(N);  // wrap around 2PI...
-    }
-
     // set the scan
-    const float r = msg.ranges[i_ros];
+    const float r = msg.ranges[i_mrpt];
     obj.setScanRange(i_mrpt, r);
 
     // set the validity of the scan
