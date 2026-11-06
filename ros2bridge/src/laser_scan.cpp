@@ -13,6 +13,7 @@
 #include <mrpt/ros2bridge/time.h>
 #include <mrpt/version.h>
 
+#include <cmath>
 #include <geometry_msgs/msg/pose.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 
@@ -24,19 +25,27 @@ bool mrpt::ros2bridge::fromROS(
   obj.timestamp = fromROS(msg.header.stamp);
   obj.rightToLeft = true;
   obj.sensorLabel = msg.header.frame_id;
-  obj.aperture = msg.angle_max - msg.angle_min;
   obj.maxRange = msg.range_max;
   obj.sweepDuration = msg.scan_time;
-
-  // ROS rays go from angle_min to angle_max, MRPT ones from -FOV/2 to +FOV/2:
-  // the sensor pose is rotated by the central angle so that ray i is the same
-  // physical ray in both, also for scans not centered on the sensor +X axis.
-  const double centerAngle = 0.5 * (static_cast<double>(msg.angle_min) + msg.angle_max);
-  obj.sensorPose = pose + mrpt::poses::CPose3D::FromYawPitchRoll(centerAngle, 0, 0);
 
   ASSERT_GT_(msg.ranges.size(), 2);
 
   const size_t N = msg.ranges.size();
+
+  // Ray i is at angle_min + i * angle_increment. angle_max may only be an upper
+  // bound of the last ray angle, so use it only if the increment is unusable.
+  double aperture = static_cast<double>(msg.angle_increment) * static_cast<double>(N - 1);
+  if (!std::isfinite(aperture) || aperture == 0)
+  {
+    aperture = static_cast<double>(msg.angle_max) - msg.angle_min;
+  }
+  obj.aperture = static_cast<float>(aperture);
+
+  // MRPT rays go from -FOV/2 to +FOV/2: the sensor pose is rotated by the
+  // central angle so that ray i is the same physical ray in both, also for
+  // scans not centered on the sensor +X axis.
+  const double centerAngle = msg.angle_min + 0.5 * aperture;
+  obj.sensorPose = pose + mrpt::poses::CPose3D::FromYawPitchRoll(centerAngle, 0, 0);
 
   obj.resizeScan(N);
   for (std::size_t i_mrpt = 0; i_mrpt < N; i_mrpt++)
