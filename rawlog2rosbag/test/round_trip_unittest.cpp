@@ -292,6 +292,7 @@ TEST(rawlog2rosbag, RoundTrip)
   EXPECT_EQ(counts["/rawlog_comment"], 1u);
   EXPECT_EQ(counts["/lidar/points"], 1u);
   EXPECT_EQ(counts["/stereo/left/image_raw/compressed"], 1u);
+  EXPECT_EQ(counts["/stereo/left/camera_info"], 1u);
   EXPECT_EQ(counts["/stereo/right/camera_info"], 1u);
 }
 
@@ -302,8 +303,12 @@ TEST(rawlog2rosbag, RejectsOutputContainingInput)
   ASSERT_NE(exe, nullptr);
 
   Fixture fx;
-  const std::string cmd = std::string(exe) + " -i " + fx.rawlog + " -o " + fx.dir + " -w";
+  const std::string errFile = fx.dir + "/stderr.txt";
+  const std::string cmd =
+      std::string(exe) + " -i " + fx.rawlog + " -o " + fx.dir + " -w 2> " + errFile;
   EXPECT_NE(std::system(cmd.c_str()), 0) << cmd;
+  EXPECT_NE(
+      mrpt::io::file_get_contents(errFile).find("must not contain the input"), std::string::npos);
   EXPECT_TRUE(mrpt::system::fileExists(fx.rawlog));
   EXPECT_TRUE(mrpt::system::fileExists(fx.imagesDir + "/" + fx.imageFile));
 }

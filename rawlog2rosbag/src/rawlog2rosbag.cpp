@@ -639,6 +639,8 @@ class Converter
           st->imageLeft, st->leftCamera, out.ns + "/left", headerOf(o, out.frame_id + "_left"));
       if (st->hasImageRight)
       {
+        // camera_info describes an already aligned stereo pair (R = identity): computing
+        // the rectification of a generic pair is a calibration task, out of scope here.
         writeImage(
             st->imageRight, st->rightCamera, out.ns + "/right",
             headerOf(o, out.frame_id + "_right"), -st->rightCamera.fx() * st->rightCameraPose.x());
