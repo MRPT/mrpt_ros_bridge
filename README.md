@@ -41,6 +41,7 @@ It simplifies integrating MRPT-based algorithms (e.g. SLAM, perception, mapping)
 | --- | --- |
 | **`mrpt_libros_bridge`** | Core C++ library bridging MRPT data types with ROS 2 messages (poses, maps, sensor data, etc.). |
 | **`rosbag2rawlog`** | Command-line tool to convert ROS 2 `.bag` files into MRPT `.rawlog` datasets. |
+| **`rawlog2rosbag`** | Command-line tool to convert MRPT `.rawlog` datasets into ROS 2 bags (`.mcap`, `.db3`). |
 
 ---
 
@@ -62,7 +63,7 @@ It simplifies integrating MRPT-based algorithms (e.g. SLAM, perception, mapping)
 Install from ROS build servers with:
 
 ```bash
-sudo apt install ros-${ROS_DISTRO}-rosbag2rawlog ros-${ROS_DISTRO}-mrpt-ros-bridge
+sudo apt install ros-${ROS_DISTRO}-rosbag2rawlog ros-${ROS_DISTRO}-rawlog2rosbag ros-${ROS_DISTRO}-mrpt-ros-bridge
 ```
 
 ## Building from sources
@@ -107,6 +108,45 @@ mrpt::ros2bridge::toROS(mrpt_pose, ros_pose);
 
 Refer to the [dataset conversions page](https://docs.mola-slam.org/latest/dataset-conversions.html) on the MOLA project website.
 
+### 3. Converting an MRPT rawlog to a ROS 2 bag
+
+```bash
+rawlog2rosbag -i dataset.rawlog -o dataset_bag/
+```
+
+Each sensor label becomes a topic namespace and a `/tf_static` frame (lower case, e.g. `LMS_SICK_LEFT` is
+written to `/lms_sick_left/scan` in frame `lms_sick_left`):
+
+| MRPT observation | ROS 2 topic(s) |
+| --- | --- |
+| `CObservation2DRangeScan` | `<ns>/scan` (`sensor_msgs/LaserScan`; invalid rays are `+inf`) |
+| `CObservationIMU` | `<ns>/imu` (`sensor_msgs/Imu`) |
+| `CObservationGPS` | `<ns>/fix` (`sensor_msgs/NavSatFix`) |
+| `CObservationImage` | `<ns>/image_raw/compressed` + `<ns>/camera_info` (`--image-mode raw` for `<ns>/image_raw`) |
+| `CObservationStereoImages` | the same, under `<ns>/left` and `<ns>/right` |
+| `CObservationPointCloud` | `<ns>/points` (`sensor_msgs/PointCloud2`) |
+| `CObservationOdometry` | `<ns>/odom` (`nav_msgs/Odometry`) + `/tf` (`odom` -> `base_link`) |
+| `CObservationRobotPose` | `<ns>/pose` (`geometry_msgs/PoseWithCovarianceStamped`) |
+| `CObservationComment` | `/rawlog_comment` (`std_msgs/String`) |
+| Other 3D sensors (`CObservation3DRangeScan`, `CObservationRotatingScan`,...) | `<ns>/points`, in the `base_link` frame |
+
+In SensoryFrame-based rawlogs, the odometry actions are integrated into `/odom` + `/tf`.
+Externally stored JPEG/PNG images are copied into the bag byte by byte, without re-encoding them.
+
+Main options (see `rawlog2rosbag --help`):
+
+- `-c topics.yaml`: per-sensor overrides of the topic namespace and frame, or `skip: true`:
+  ```yaml
+  sensors:
+    CAMERA_LEFT:
+      ns: /camera_left
+      frame_id: camera_left_optical_frame
+  ```
+- `--gt-tum gt.txt`: also writes a ground-truth trajectory (TUM format) to `/ground_truth` (`nav_msgs/Odometry`).
+- `--storage-id mcap|sqlite3`, `--storage-preset zstd_fast|zstd_small|...`.
+- `--no-latched-qos`: do not store the `transient_local` QoS of `/tf_static`. Bags written with QoS profiles
+  by ROS 2 Jazzy or newer cannot be read by ROS 2 Humble.
+
 ---
 
 ## Testing
@@ -114,7 +154,7 @@ Refer to the [dataset conversions page](https://docs.mola-slam.org/latest/datase
 Run unit tests with:
 
 ```bash
-colcon test --packages-select mrpt_libros_bridge
+colcon test --packages-select mrpt_libros_bridge rawlog2rosbag
 colcon test-result --verbose
 ```
 

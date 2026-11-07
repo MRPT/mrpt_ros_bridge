@@ -15,6 +15,7 @@
 
 #include <cmath>
 #include <geometry_msgs/msg/pose.hpp>
+#include <limits>
 #include <sensor_msgs/msg/laser_scan.hpp>
 
 bool mrpt::ros2bridge::fromROS(
@@ -81,10 +82,20 @@ bool mrpt::ros2bridge::toROS(
   msg.range_min = 0.02f;
   msg.range_max = obj.maxRange;
 
+  // ROS rays always go counterclockwise. Invalid MRPT rays become +inf
+  // ("no return"), following REP 117.
+  const bool hasIntensity = obj.hasIntensity();
   msg.ranges.resize(nRays);
+  msg.intensities.resize(hasIntensity ? nRays : 0);
   for (size_t i = 0; i < nRays; i++)
   {
-    msg.ranges[i] = obj.getScanRange(i);
+    const size_t i_mrpt = obj.rightToLeft ? i : (nRays - 1 - i);
+    msg.ranges[i] = obj.getScanRangeValidity(i_mrpt) ? obj.getScanRange(i_mrpt)
+                                                     : std::numeric_limits<float>::infinity();
+    if (hasIntensity)
+    {
+      msg.intensities[i] = static_cast<float>(obj.getScanIntensity(i_mrpt));
+    }
   }
 
   // Set header data:

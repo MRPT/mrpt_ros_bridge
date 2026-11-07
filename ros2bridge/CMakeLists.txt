@@ -43,6 +43,8 @@ add_library(${PROJECT_NAME} SHARED
   src/point_cloud2.cpp
   src/image.cpp
   src/stereo_image.cpp
+  src/camera_info.cpp
+  src/odometry.cpp
   src/ros_to_mrpt_obs.cpp
   src/rosbag2_to_mrpt.cpp
 )
@@ -107,6 +109,7 @@ if(BUILD_TESTING)
   find_package(Eigen3 REQUIRED NO_MODULE)
 
   ament_add_gtest(test_${PROJECT_NAME}
+    test/camera_info_unittest.cpp
     test/gps_unittest.cpp
     test/image_unittest.cpp
     test/imu_unittest.cpp

@@ -136,3 +136,26 @@ TEST(GPS, NavSatFix_RoundTrip_Covariance)
   EXPECT_NEAR(out_msg.position_covariance[4], 4.0, 1e-9);
   EXPECT_NEAR(out_msg.position_covariance[8], 9.0, 1e-9);
 }
+// Without an explicit fix type, the status comes from the GGA fix quality:
+TEST(GPS, NavSatFix_ToROS_StatusFromGgaQuality)
+{
+  const std::vector<std::pair<uint8_t, int8_t>> cases = {
+      {0, -1},
+      {1,  0},
+      {2,  2},
+      {4,  2},
+      {5,  2}
+  };
+  for (const auto& [quality, expectedStatus] : cases)
+  {
+    mrpt::obs::CObservationGPS obs;
+    mrpt::obs::gnss::Message_NMEA_GGA gga;
+    gga.fields.fix_quality = quality;
+    obs.setMsg(gga);
+    obs.fix_type = mrpt::obs::GnssFixType::UNKNOWN;
+
+    sensor_msgs::msg::NavSatFix msg;
+    ASSERT_TRUE(mrpt::ros2bridge::toROS(obs, std_msgs::msg::Header(), msg));
+    EXPECT_EQ(msg.status.status, expectedStatus) << "GGA quality " << int(quality);
+  }
+}

@@ -8,7 +8,9 @@
    +------------------------------------------------------------------------+ */
 
 #include <gtest/gtest.h>
+#include <mrpt/io/vector_loadsave.h>
 #include <mrpt/ros2bridge/image.h>
+#include <mrpt/system/filesystem.h>
 
 #include <sensor_msgs/image_encodings.hpp>
 #include <std_msgs/msg/header.hpp>
@@ -169,4 +171,37 @@ TEST(Image, rejectsTruncatedData)
 {
   auto msg = makeImage(sensor_msgs::image_encodings::RGB8, 2, 2, 3, std::vector<uint8_t>(6, 0));
   EXPECT_THROW(mrpt::ros2bridge::fromROS(msg), std::exception);
+}
+
+TEST(CompressedImage, ExternalFileIsCopiedVerbatim)
+{
+  mrpt::img::CImage img(32, 24, mrpt::img::CH_RGB);
+  img.filledRectangle({0, 0}, {31, 23}, mrpt::img::TColor(10, 200, 30));
+  const std::string file = mrpt::system::getTempFileName() + ".jpg";
+  ASSERT_TRUE(img.saveToFile(file));
+
+  mrpt::img::CImage ext;
+  ext.setExternalStorage(file);
+  const auto msg = mrpt::ros2bridge::toROS_Compressed(ext, std_msgs::msg::Header());
+  EXPECT_EQ(msg.format, "jpeg");
+
+  std::vector<uint8_t> fileBytes;
+  ASSERT_TRUE(mrpt::io::loadBinaryFile(fileBytes, file));
+  EXPECT_EQ(msg.data, fileBytes);
+  mrpt::system::deleteFile(file);
+}
+
+TEST(CompressedImage, InMemoryImageRoundTrip)
+{
+  mrpt::img::CImage img(32, 24, mrpt::img::CH_RGB);
+  img.filledRectangle({0, 0}, {31, 23}, mrpt::img::TColor(10, 200, 30));
+
+  const auto msg = mrpt::ros2bridge::toROS_Compressed(img, std_msgs::msg::Header());
+  EXPECT_EQ(msg.format, "jpeg");
+  ASSERT_FALSE(msg.data.empty());
+
+  const auto back = mrpt::ros2bridge::fromROS(msg);
+  ASSERT_EQ(back.getWidth(), 32);
+  ASSERT_EQ(back.getHeight(), 24);
+  EXPECT_NEAR(back.at<uint8_t>(5, 5, 1), 200, 5);
 }
