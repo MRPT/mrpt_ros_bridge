@@ -117,6 +117,7 @@ if(BUILD_TESTING)
     test/map_unittest.cpp
     test/pointcloud2_unittest.cpp
     test/pose_unittest.cpp
+    test/rosbag2_to_mrpt_unittest.cpp
     test/time_unittest.cpp
   )
 
