@@ -20,6 +20,9 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(cv_bridge QUIET)
 
 find_package(rosbag2_cpp QUIET)  # optional
+find_package(rmw REQUIRED)
+find_package(rmw_implementation REQUIRED)
+find_package(rosidl_typesupport_cpp REQUIRED)
 if(rosbag2_cpp_FOUND)
   set(rosbag2_cpp_lib       rosbag2_cpp::rosbag2_cpp)
   set(rosbag2_cpp_cmake_dep rosbag2_cpp)
@@ -69,6 +72,9 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
   stereo_msgs::stereo_msgs__rosidl_typesupport_cpp
   tf2_geometry_msgs::tf2_geometry_msgs
   tf2::tf2
+  rmw::rmw
+  rmw_implementation::rmw_implementation
+  rosidl_typesupport_cpp::rosidl_typesupport_cpp
 )
 
 # Installation rules
@@ -97,6 +103,9 @@ ament_export_dependencies(
   std_msgs
   tf2
   tf2_geometry_msgs
+  rmw
+  rmw_implementation
+  rosidl_typesupport_cpp
   ${rosbag2_cpp_cmake_dep}
   mrpt_maps
   mrpt_obs
@@ -117,6 +126,7 @@ if(BUILD_TESTING)
     test/map_unittest.cpp
     test/pointcloud2_unittest.cpp
     test/pose_unittest.cpp
+    test/rosbag2_to_mrpt_unittest.cpp
     test/time_unittest.cpp
   )
 

@@ -34,6 +34,9 @@
   <depend>tf2</depend>
 
   <depend>rosbag2_cpp</depend> <!-- Optional -->
+  <depend>rmw</depend>
+  <depend>rmw_implementation</depend>
+  <depend>rosidl_typesupport_cpp</depend>
 
   <doc_depend>doxygen</doc_depend>
 

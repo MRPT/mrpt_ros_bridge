@@ -15,6 +15,7 @@
  * @date   2025
  */
 
+#include <mrpt/core/exceptions.h>
 #include <mrpt/img/CImage.h>
 #include <mrpt/maps/CGenericPointsMap.h>
 #include <mrpt/maps/CSimplePointsMap.h>
@@ -35,20 +36,49 @@
 #include <mrpt/ros2bridge/rosbag2_to_mrpt.h>
 #include <mrpt/ros2bridge/time.h>
 #include <mrpt/version.h>
+#include <rmw/error_handling.h>
+#include <rmw/rmw.h>
 
 #include <memory>
 #include <nav_msgs/msg/odometry.hpp>
-#include <rclcpp/serialization.hpp>
-#include <rclcpp/serialized_message.hpp>
 #include <rosbag2_cpp/converter_options.hpp>
 #include <rosbag2_cpp/readers/sequential_reader.hpp>
+#include <rosbag2_storage/serialized_bag_message.hpp>
+#include <rosidl_typesupport_cpp/message_type_support.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <stdexcept>
+#include <string>
 #include <tf2/buffer_core.hpp>
 #include <tf2_msgs/msg/tf_message.hpp>
+
+namespace
+{
+// Deserializes straight from the bag buffer: wrapping it into an
+// rclcpp::SerializedMessage first would copy the whole payload.
+template <typename MSG>
+void deserializeBagMessage(const rosbag2_storage::SerializedBagMessage& m, MSG& msg)
+{
+  // Shorter than a CDR header: some rmw implementations would read past it.
+  if (!m.serialized_data || m.serialized_data->buffer_length < 4)
+  {
+    throw std::runtime_error("Empty or truncated message in topic '" + m.topic_name + "'");
+  }
+  const auto ret = rmw_deserialize(
+      m.serialized_data.get(), rosidl_typesupport_cpp::get_message_type_support_handle<MSG>(),
+      &msg);
+  if (ret != RMW_RET_OK)
+  {
+    const std::string err = rmw_get_error_string().str;
+    rmw_reset_error();
+    throw std::runtime_error(
+        "Failed to deserialize a message of topic '" + m.topic_name + "': " + err);
+  }
+}
+}  // namespace
 
 namespace mrpt::ros2bridge
 {
@@ -63,11 +93,8 @@ ObsVector rosbag2ToPointCloud2(
     const std::string& base_link_frame,
     const std::optional<mrpt::poses::CPose3D>& fixedSensorPose)
 {
-  rclcpp::SerializedMessage serMsg(*rosmsg.serialized_data);
-  static rclcpp::Serialization<sensor_msgs::msg::PointCloud2> serializer;
-
   sensor_msgs::msg::PointCloud2 pts;
-  serializer.deserialize_message(&serMsg, &pts);
+  deserializeBagMessage(rosmsg, pts);
 
   // Use the shared helper that picks the richest map type and
   // fixes Livox timestamps:
@@ -97,11 +124,8 @@ ObsVector rosbag2ToLidar2D(
     const std::string& base_link_frame,
     const std::optional<mrpt::poses::CPose3D>& fixedSensorPose)
 {
-  rclcpp::SerializedMessage serMsg(*rosmsg.serialized_data);
-  static rclcpp::Serialization<sensor_msgs::msg::LaserScan> serializer;
-
   sensor_msgs::msg::LaserScan scan;
-  serializer.deserialize_message(&serMsg, &scan);
+  deserializeBagMessage(rosmsg, scan);
 
   // Resolve sensor pose first (needed by the fromROS conversion):
   mrpt::poses::CPose3D sensorPose;
@@ -129,11 +153,8 @@ ObsVector rosbag2ToRotatingScan(
     const std::string& base_link_frame,
     const std::optional<mrpt::poses::CPose3D>& fixedSensorPose)
 {
-  rclcpp::SerializedMessage serMsg(*rosmsg.serialized_data);
-  static rclcpp::Serialization<sensor_msgs::msg::PointCloud2> serializer;
-
   sensor_msgs::msg::PointCloud2 pts;
-  serializer.deserialize_message(&serMsg, &pts);
+  deserializeBagMessage(rosmsg, pts);
 
   // Check required fields:
   const std::set<std::string> fields = mrpt::ros2bridge::extractFields(pts);
@@ -174,11 +195,8 @@ ObsVector rosbag2ToIMU(
     const std::string& base_link_frame,
     const std::optional<mrpt::poses::CPose3D>& fixedSensorPose)
 {
-  rclcpp::SerializedMessage serMsg(*rosmsg.serialized_data);
-  static rclcpp::Serialization<sensor_msgs::msg::Imu> serializer;
-
   sensor_msgs::msg::Imu imu;
-  serializer.deserialize_message(&serMsg, &imu);
+  deserializeBagMessage(rosmsg, imu);
 
   auto obs = imuToObservation(imu, std::string(sensorLabel));
 
@@ -203,24 +221,20 @@ ObsVector rosbag2ToGPS(
     const std::optional<mrpt::poses::CPose3D>& fixedSensorPose,
     bool isGpsFix)
 {
-  rclcpp::SerializedMessage serMsg(*rosmsg.serialized_data);
-
   mrpt::obs::CObservationGPS::Ptr obs;
   std::string frame_id;
 
   if (isGpsFix)
   {
-    static rclcpp::Serialization<gps_msgs::msg::GPSFix> serializer;
     gps_msgs::msg::GPSFix gps;
-    serializer.deserialize_message(&serMsg, &gps);
+    deserializeBagMessage(rosmsg, gps);
     obs = gpsFixToObservation(gps, std::string(sensorLabel));
     frame_id = gps.header.frame_id;
   }
   else
   {
-    static rclcpp::Serialization<sensor_msgs::msg::NavSatFix> serializer;
     sensor_msgs::msg::NavSatFix gps;
-    serializer.deserialize_message(&serMsg, &gps);
+    deserializeBagMessage(rosmsg, gps);
     obs = navSatFixToObservation(gps, std::string(sensorLabel));
     frame_id = gps.header.frame_id;
   }
@@ -240,11 +254,8 @@ ObsVector rosbag2ToGPS(
 ObsVector rosbag2ToOdometry(
     std::string_view sensorLabel, const rosbag2_storage::SerializedBagMessage& rosmsg)
 {
-  rclcpp::SerializedMessage serMsg(*rosmsg.serialized_data);
-  static rclcpp::Serialization<nav_msgs::msg::Odometry> serializer;
-
   nav_msgs::msg::Odometry odo;
-  serializer.deserialize_message(&serMsg, &odo);
+  deserializeBagMessage(rosmsg, odo);
 
   auto obs = odometryToObservation(odo, std::string(sensorLabel));
 
@@ -261,11 +272,8 @@ ObsVector rosbag2ToImage(
     const std::string& base_link_frame,
     const std::optional<mrpt::poses::CPose3D>& fixedSensorPose)
 {
-  rclcpp::SerializedMessage serMsg(*rosmsg.serialized_data);
-  static rclcpp::Serialization<sensor_msgs::msg::Image> serializer;
-
   auto image = std::make_shared<sensor_msgs::msg::Image>();
-  serializer.deserialize_message(&serMsg, image.get());
+  deserializeBagMessage(rosmsg, *image);
 
   auto imgObs = mrpt::obs::CObservationImage::Create();
 
@@ -290,11 +298,8 @@ ObsVector rosbag2ToImage(
 template <bool isStatic>
 void rosbag2ToTf(tf2::BufferCore& tfBuffer, const rosbag2_storage::SerializedBagMessage& rosmsg)
 {
-  static rclcpp::Serialization<tf2_msgs::msg::TFMessage> tfSerializer;
-
   tf2_msgs::msg::TFMessage tfs;
-  rclcpp::SerializedMessage msgData(*rosmsg.serialized_data);
-  tfSerializer.deserialize_message(&msgData, &tfs);
+  deserializeBagMessage(rosmsg, tfs);
 
   for (auto& tf : tfs.transforms)
   {
