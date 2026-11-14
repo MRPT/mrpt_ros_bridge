@@ -8,6 +8,8 @@
    +------------------------------------------------------------------------+ */
 
 #include <gtest/gtest.h>
+#include <mrpt/obs/CObservation2DRangeScan.h>
+#include <mrpt/obs/CObservationGPS.h>
 #include <mrpt/obs/CObservationIMU.h>
 #include <mrpt/obs/CObservationImage.h>
 #include <mrpt/obs/CObservationOdometry.h>
@@ -22,6 +24,8 @@
 #include <rosbag2_storage/serialized_bag_message.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/imu.hpp>
+#include <sensor_msgs/msg/laser_scan.hpp>
+#include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <sensor_msgs/point_cloud2_iterator.hpp>
 #include <string>
@@ -101,6 +105,7 @@ TEST(Rosbag2ToMRPT, Image)
   ASSERT_TRUE(o);
   EXPECT_EQ(o->image.getWidth(), 4);
   EXPECT_EQ(o->image.getHeight(), 3);
+  EXPECT_EQ(o->image.at<uint8_t>(2, 1, 0), 200);
 }
 
 TEST(Rosbag2ToMRPT, PointCloud2)
@@ -124,7 +129,58 @@ TEST(Rosbag2ToMRPT, PointCloud2)
   ASSERT_EQ(obs.size(), 1U);
   const auto o = std::dynamic_pointer_cast<mrpt::obs::CObservationPointCloud>(obs.at(0));
   ASSERT_TRUE(o && o->pointcloud);
-  EXPECT_EQ(o->pointcloud->size(), 100U);
+  ASSERT_EQ(o->pointcloud->size(), 100U);
+  const auto& xs = o->pointcloud->getPointsBufferRef_x();
+  const auto& zs = o->pointcloud->getPointsBufferRef_z();
+  EXPECT_FLOAT_EQ(xs[42], 42.0f);
+  EXPECT_FLOAT_EQ(zs[42], 2.0f);
+}
+
+TEST(Rosbag2ToMRPT, LaserScan)
+{
+  sensor_msgs::msg::LaserScan scan;
+  scan.header = header("laser");
+  scan.angle_min = -1.0f;
+  scan.angle_max = 1.0f;
+  scan.angle_increment = 0.5f;
+  scan.range_min = 0.1f;
+  scan.range_max = 10.0f;
+  scan.ranges = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+
+  tf2::BufferCore tf;
+  const auto obs = mrpt::ros2bridge::rosbag2ToLidar2D(
+      "laser", toBagMessage(scan, "/scan"), tf, "base_link", kFixedPose);
+  ASSERT_EQ(obs.size(), 1U);
+  const auto o = std::dynamic_pointer_cast<mrpt::obs::CObservation2DRangeScan>(obs.at(0));
+  ASSERT_TRUE(o);
+  ASSERT_EQ(o->getScanSize(), 5U);
+  EXPECT_FLOAT_EQ(o->getScanRange(2), 3.0f);
+}
+
+TEST(Rosbag2ToMRPT, NavSatFix)
+{
+  sensor_msgs::msg::NavSatFix fix;
+  fix.header = header("gps");
+  fix.latitude = 36.83;
+  fix.longitude = -2.40;
+  fix.altitude = 100.0;
+
+  tf2::BufferCore tf;
+  const auto obs =
+      mrpt::ros2bridge::rosbag2ToGPS("gps", toBagMessage(fix, "/gps"), tf, "base_link", kFixedPose);
+  ASSERT_EQ(obs.size(), 1U);
+  EXPECT_TRUE(std::dynamic_pointer_cast<mrpt::obs::CObservationGPS>(obs.at(0)));
+}
+
+TEST(Rosbag2ToMRPT, EmptyPayloadThrows)
+{
+  sensor_msgs::msg::Imu imu;
+  imu.header = header("imu");
+  auto m = toBagMessage(imu, "/imu");
+  tf2::BufferCore tf;
+
+  m.serialized_data->buffer_length = 0;
+  EXPECT_ANY_THROW(mrpt::ros2bridge::rosbag2ToIMU("imu", m, tf, "base_link", kFixedPose));
 }
 
 TEST(Rosbag2ToMRPT, Odometry)

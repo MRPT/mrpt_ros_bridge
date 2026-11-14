@@ -36,18 +36,22 @@
 #include <mrpt/ros2bridge/rosbag2_to_mrpt.h>
 #include <mrpt/ros2bridge/time.h>
 #include <mrpt/version.h>
+#include <rmw/error_handling.h>
 #include <rmw/rmw.h>
 
 #include <memory>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rosbag2_cpp/converter_options.hpp>
 #include <rosbag2_cpp/readers/sequential_reader.hpp>
+#include <rosbag2_storage/serialized_bag_message.hpp>
 #include <rosidl_typesupport_cpp/message_type_support.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <stdexcept>
+#include <string>
 #include <tf2/buffer_core.hpp>
 #include <tf2_msgs/msg/tf_message.hpp>
 
@@ -58,10 +62,21 @@ namespace
 template <typename MSG>
 void deserializeBagMessage(const rosbag2_storage::SerializedBagMessage& m, MSG& msg)
 {
+  // Shorter than a CDR header: some rmw implementations would read past it.
+  if (!m.serialized_data || m.serialized_data->buffer_length < 4)
+  {
+    throw std::runtime_error("Empty or truncated message in topic '" + m.topic_name + "'");
+  }
   const auto ret = rmw_deserialize(
       m.serialized_data.get(), rosidl_typesupport_cpp::get_message_type_support_handle<MSG>(),
       &msg);
-  ASSERTMSG_(ret == RMW_RET_OK, "rmw_deserialize() failed for topic '" + m.topic_name + "'");
+  if (ret != RMW_RET_OK)
+  {
+    const std::string err = rmw_get_error_string().str;
+    rmw_reset_error();
+    throw std::runtime_error(
+        "Failed to deserialize a message of topic '" + m.topic_name + "': " + err);
+  }
 }
 }  // namespace
 
