@@ -72,12 +72,6 @@
 #include <memory>
 #include <optional>
 
-#if CV_BRIDGE_VERSION < 0x030400
-#include <cv_bridge/cv_bridge.h>
-#else
-#include <cv_bridge/cv_bridge.hpp>
-#endif
-
 using namespace mrpt;
 using namespace mrpt::serialization;
 using namespace mrpt::system;
@@ -252,63 +246,6 @@ Obs fromGenericMrptObservation(const rosbag2_storage::SerializedBagMessage& rosm
   return {o};
 }
 
-#if 0
-Obs toRangeImage(
-	std::string_view msg, const sensor_msgs::Image::Ptr& image,
-	const sensor_msgs::CameraInfo::Ptr& cameraInfo, bool rangeIsDepth)
-{
-	auto cv_ptr = cv_bridge::toCvShare(image);
-
-	// For now we are just assuming this is a range image
-	if (cv_ptr->encoding == "32FC1")
-	{
-		auto rangeScan = mrpt::obs::CObservation3DRangeScan::Create();
-
-		// MRPT assumes the image plane is parallel to the YZ plane, so the
-		// camera is pointed in the X direction ROS assumes the image plane
-		// is parallel to XY plane, so the camera is pointed in the Z
-		// direction Apply a rotation to convert between these conventions.
-		mrpt::math::CQuaternion<double> rot{0.5, 0.5, -0.5, 0.5};
-		mrpt::poses::CPose3DQuat poseQuat(0, 0, 0, rot);
-		mrpt::poses::CPose3D pose(poseQuat);
-		rangeScan->setSensorPose(pose);
-
-		rangeScan->sensorLabel = msg;
-		rangeScan->timestamp = mrpt::ros2bridge::fromROS(image->header.stamp);
-
-		rangeScan->hasRangeImage = true;
-		rangeScan->rangeImage_setSize(cv_ptr->image.rows, cv_ptr->image.cols);
-
-		rangeScan->cameraParams.nrows = cv_ptr->image.rows;
-		rangeScan->cameraParams.ncols = cv_ptr->image.cols;
-
-		std::copy(
-			cameraInfo->D.begin(), cameraInfo->D.end(),
-			rangeScan->cameraParams.dist.begin());
-
-		size_t rows = cv_ptr->image.rows;
-		size_t cols = cv_ptr->image.cols;
-		std::copy(
-			cameraInfo->K.begin(), cameraInfo->K.end(),
-			rangeScan->cameraParams.intrinsicParams.begin());
-
-		rangeScan->rangeUnits = 1e-3;
-		const float inv_unit = 1.0f / rangeScan->rangeUnits;
-
-		for (size_t i = 0; i < rows; i++)
-			for (size_t j = 0; j < cols; j++)
-				rangeScan->rangeImage(i, j) = static_cast<uint16_t>(
-					inv_unit * cv_ptr->image.at<float>(i, j));
-
-		rangeScan->range_is_depth = rangeIsDepth;
-
-		return {rangeScan};
-	}
-	return {};
-}
-
-#endif
-
 template <bool isStatic>
 Obs toTf(tf2::BufferCore& tfBuffer, const rosbag2_storage::SerializedBagMessage& rosmsg)
 {
@@ -405,27 +342,6 @@ class Transcriber
         fixedSensorPose = mrpt::poses::CPose3D::FromString(
             "["s + sensor["fixed_sensor_pose"].as<std::string>() + "]"s);
       }
-#if 0
-			if (sensorType == "CObservation3DRangeScan")
-			{
-				bool rangeIsDepth = sensor.count("rangeIsDepth")
-										? sensor.at("rangeIsDepth").as<bool>()
-										: true;
-				auto callback = [=](const sensor_msgs::Image::Ptr& image,
-									const sensor_msgs::CameraInfo::Ptr& info) {
-					return toRangeImage(sensorName, image, info, rangeIsDepth);
-				};
-				using Synchronizer = RosSynchronizer<
-					sensor_msgs::Image, sensor_msgs::CameraInfo>;
-				auto sync = std::make_shared<Synchronizer>(
-					rootFrame, tfBuffer, callback);
-				m_lookup[sensor.at("depth").as<std::string>()].emplace_back(
-					sync->bind<0>());
-				m_lookup[sensor.at("cameraInfo").as<std::string>()]
-					.emplace_back(sync->bind<1>());
-				m_lookup["/tf"].emplace_back(sync->bindTfSync());
-			}
-#endif
 
       if (sensorType == "CObservationImage")
       {

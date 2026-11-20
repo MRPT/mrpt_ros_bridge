@@ -16,7 +16,6 @@
 
   <!-- DEPS -->
   <depend>cli11</depend>
-  <depend>cv_bridge</depend>
   <depend version_gte="3.0.0">mrpt_containers</depend>
   <depend version_gte="3.0.0">mrpt_maps</depend>
   <depend>mrpt_libros_bridge</depend>
