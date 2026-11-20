@@ -97,7 +97,7 @@ ObsVector rosbag2ToGPS(
 ObsVector rosbag2ToOdometry(
     std::string_view sensorLabel, const rosbag2_storage::SerializedBagMessage& rosmsg);
 
-/** Image → CObservationImage (uses cv_bridge). */
+/** Image → CObservationImage. */
 ObsVector rosbag2ToImage(
     std::string_view sensorLabel,
     const rosbag2_storage::SerializedBagMessage& rosmsg,
