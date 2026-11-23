@@ -78,3 +78,39 @@ TEST(Odometry, ToROS)
   EXPECT_DOUBLE_EQ(msg.twist.twist.linear.x, 0.3);
   EXPECT_DOUBLE_EQ(msg.twist.twist.angular.z, 0.1);
 }
+
+TEST(CameraInfo, RectifiedRoiAndBinning)
+{
+  sensor_msgs::msg::CameraInfo ci;
+  ci.width = 1280;
+  ci.height = 720;
+  ci.distortion_model = "plumb_bob";
+  ci.d = {0, 0, 0, 0, 0};
+  // Rectified image: P, not K, describes it.
+  ci.k = {700, 0, 640, 0, 700, 360, 0, 0, 1};
+  ci.p = {650, 0, 630, 0, 0, 650, 350, 0, 0, 0, 1, 0};
+  ci.roi.x_offset = 100;
+  ci.roi.y_offset = 50;
+  ci.roi.width = 800;
+  ci.roi.height = 600;
+  ci.binning_x = 2;
+  ci.binning_y = 2;
+
+  const auto cam = mrpt::ros2bridge::fromROS(ci);
+  EXPECT_EQ(cam.ncols, 400U);
+  EXPECT_EQ(cam.nrows, 300U);
+  EXPECT_DOUBLE_EQ(cam.fx(), 325.0);
+  EXPECT_DOUBLE_EQ(cam.fy(), 325.0);
+  EXPECT_DOUBLE_EQ(cam.cx(), (630.0 - 100.0) / 2);
+  EXPECT_DOUBLE_EQ(cam.cy(), (350.0 - 50.0) / 2);
+
+  // With distortion, K describes the (raw) image:
+  ci.d[0] = 0.1;
+  ci.roi = sensor_msgs::msg::RegionOfInterest();
+  ci.binning_x = 0;
+  ci.binning_y = 0;
+  const auto raw = mrpt::ros2bridge::fromROS(ci);
+  EXPECT_EQ(raw.ncols, 1280U);
+  EXPECT_DOUBLE_EQ(raw.fx(), 700.0);
+  EXPECT_DOUBLE_EQ(raw.cx(), 640.0);
+}

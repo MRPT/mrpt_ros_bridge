@@ -19,7 +19,9 @@
 #include <mrpt/obs/CObservation.h>
 #include <mrpt/poses/CPose3D.h>
 
+#include <cstdint>
 #include <optional>
+#include <std_msgs/msg/header.hpp>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -36,6 +38,8 @@ class SerializedBagMessage;
 
 namespace mrpt::ros2bridge
 {
+class RgbdAssembler;
+
 /** \addtogroup mrpt_ros2bridge_grp
  * @{ */
 
@@ -104,6 +108,29 @@ ObsVector rosbag2ToImage(
     tf2::BufferCore& tfBuffer,
     const std::string& base_link_frame,
     const std::optional<mrpt::poses::CPose3D>& fixedSensorPose);
+
+/** The topics of an RGB-D camera, for rosbag2ToRgbd(). */
+enum class RgbdTopic : uint8_t
+{
+  Depth,
+  DepthCameraInfo,
+  Intensity,
+  IntensityCameraInfo
+};
+
+/** Feeds a message of one of the topics of an RGB-D camera into its assembler, and
+ *  returns the CObservation3DRangeScan it completes, if any (see RgbdAssembler).
+ *
+ * \param compressed  Whether an image topic holds sensor_msgs/CompressedImage
+ *                    (compressedDepth for the depth), see isCompressedImageTopic().
+ * \param imageHeader If not null, the header of an image message is stored here.
+ */
+ObsVector rosbag2ToRgbd(
+    RgbdAssembler& assembler,
+    RgbdTopic topic,
+    bool compressed,
+    const rosbag2_storage::SerializedBagMessage& rosmsg,
+    std_msgs::msg::Header* imageHeader = nullptr);
 
 /** Deserialize a /tf or /tf_static message and feed it into a
  *  tf2::BufferCore.

@@ -104,9 +104,17 @@ mrpt::poses::CPose3D mrpt_pose(1.0, 2.0, 0.0, 0.0, 0.0, 1.57);
 mrpt::ros2bridge::toROS(mrpt_pose, ros_pose);
 ```
 
+RGB-D and depth cameras (`mrpt/ros2bridge/rgbd.h`): `RgbdAssembler` pairs the depth, intensity
+(color or infrared) and `camera_info` topics of a camera into `mrpt::obs::CObservation3DRangeScan`
+observations. Raw or compressed images (`compressedDepth` PNG/RVL, JPEG/PNG), depth in `16UC1`
+(mm) or `32FC1` (m), so it works with Azure Kinect, ZED, RealSense, OAK-D, Orbbec... cameras,
+live or from bags. Used by `rosbag2rawlog` (`type: CObservation3DRangeScan`) and by MOLA.
+
 ### 2. Converting a ROS 2 bag to MRPT rawlog
 
 Refer to the [dataset conversions page](https://docs.mola-slam.org/latest/dataset-conversions.html) on the MOLA project website.
+For robots running inside a namespace, the config file may set `tf_topic` and `tf_static_topic`
+(default: `/tf`, `/tf_static`).
 
 ### 3. Converting an MRPT rawlog to a ROS 2 bag
 

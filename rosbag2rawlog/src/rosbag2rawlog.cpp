@@ -33,6 +33,7 @@
 #include <mrpt/ros2bridge/laser_scan.h>
 #include <mrpt/ros2bridge/point_cloud2.h>
 #include <mrpt/ros2bridge/pose.h>
+#include <mrpt/ros2bridge/rgbd.h>
 #include <mrpt/ros2bridge/ros_to_mrpt_obs.h>
 #include <mrpt/ros2bridge/rosbag2_to_mrpt.h>
 #include <mrpt/ros2bridge/time.h>
@@ -321,10 +322,13 @@ class Transcriber
       }
     }
 
-    m_lookup["/tf"].emplace_back([=](const rosbag2_storage::SerializedBagMessage& rosmsg)
-                                 { return toTf<false>(*tfBuffer, rosmsg); });
-    m_lookup["/tf_static"].emplace_back([=](const rosbag2_storage::SerializedBagMessage& rosmsg)
-                                        { return toTf<true>(*tfBuffer, rosmsg); });
+    // e.g. "/<robot_ns>/tf" in robots running inside a namespace:
+    const auto tfTopic = config.getOrDefault<std::string>("tf_topic", "/tf");
+    const auto tfStaticTopic = config.getOrDefault<std::string>("tf_static_topic", "/tf_static");
+    m_lookup[tfTopic].emplace_back([=](const rosbag2_storage::SerializedBagMessage& rosmsg)
+                                   { return toTf<false>(*tfBuffer, rosmsg); });
+    m_lookup[tfStaticTopic].emplace_back([=](const rosbag2_storage::SerializedBagMessage& rosmsg)
+                                         { return toTf<true>(*tfBuffer, rosmsg); });
 
     for (auto& sensorNode : config["sensors"].asMap())
     {
@@ -414,6 +418,34 @@ class Transcriber
         };
         m_lookup[sensor["topic"].as<std::string>()].emplace_back(callback);
       }
+      else if (sensorType == "CObservation3DRangeScan")
+      {
+        // RGB-D and depth cameras: several topics (depth, intensity, camera_info).
+        auto [topics, params] = mrpt::ros2bridge::rgbdSensorFromYaml(sensor, sensorName);
+        params.fixedSensorPose = fixedSensorPose;
+        auto assembler = std::make_shared<mrpt::ros2bridge::RgbdAssembler>(
+            params, tfBuffer, cli.base_link_frame);
+
+        const auto addTopic = [&](const std::string& topic, mrpt::ros2bridge::RgbdTopic which)
+        {
+          const bool compressed = mrpt::ros2bridge::isCompressedImageTopic(topic);
+          m_lookup[topic].emplace_back(
+              [assembler, which, compressed](const rosbag2_storage::SerializedBagMessage& m) -> Obs
+              {
+                auto v = mrpt::ros2bridge::rosbag2ToRgbd(*assembler, which, compressed, m);
+                return Obs(v.begin(), v.end());
+              });
+        };
+        using mrpt::ros2bridge::RgbdTopic;
+        addTopic(topics.depth, RgbdTopic::Depth);
+        addTopic(topics.depthCameraInfo, RgbdTopic::DepthCameraInfo);
+        if (params.withIntensity)
+        {
+          addTopic(topics.intensity, RgbdTopic::Intensity);
+          addTopic(topics.intensityCameraInfo, RgbdTopic::IntensityCameraInfo);
+        }
+        m_rgbdAssemblers.push_back(assembler);
+      }
       else if (sensorType == "GenericObservation")
       {
         auto callback = [=](const rosbag2_storage::SerializedBagMessage& m)
@@ -452,8 +484,31 @@ class Transcriber
     return rets;
   };
 
+  /** Frames of the RGB-D sensors that could not be converted, and why. */
+  void printRgbdStats() const
+  {
+    for (const auto& a : m_rgbdAssemblers)
+    {
+      const auto& label = a->parameters().sensorLabel;
+      if (a->droppedWithoutCameraInfo() + a->droppedUnpaired() + a->droppedWithoutTf() == 0)
+      {
+        continue;
+      }
+      std::cout << "RGB-D sensor '" << label
+                << "': frames dropped waiting for camera_info: " << a->droppedWithoutCameraInfo()
+                << ", without a depth/intensity counterpart within max_time_offset: "
+                << a->droppedUnpaired() << ", without /tf: " << a->droppedWithoutTf();
+      if (!a->lastTfError().empty())
+      {
+        std::cout << " (" << a->lastTfError() << ")";
+      }
+      std::cout << "\n";
+    }
+  }
+
  private:
   std::map<std::string, std::vector<CallbackFunction>> m_lookup;
+  std::vector<std::shared_ptr<mrpt::ros2bridge::RgbdAssembler>> m_rgbdAssemblers;
   std::set<std::string> m_unhandledTopics;
 };
 
@@ -549,6 +604,7 @@ int main(int argc, char** argv)
     }
 
     printf("\n");
+    t.printRgbdStats();
 
     reader.close();
 
