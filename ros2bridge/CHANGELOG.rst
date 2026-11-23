@@ -2,8 +2,8 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Forthcoming
------------
+4.2.0 (2026-11-23)
+------------------
 * New MRPT <-> ROS conversions: CameraInfo <-> TCamera, CompressedImage <-> CImage, CObservationOdometry -> nav_msgs/Odometry
 * toROS() fixes for IMU (orientation from yaw/pitch/roll, diagonal covariances), LaserScan (invalid rays as +inf, clockwise scans, intensities) and NavSatFix (RTK fix status)
 * Fix PoseWithCovariance <-> CPose3DPDFGaussian rotation covariance conversion (`#15 <https://github.com/MRPT/mrpt_ros_bridge/issues/15>`_)
