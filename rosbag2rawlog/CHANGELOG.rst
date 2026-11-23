@@ -2,6 +2,11 @@
 Changelog for package rosbag2rawlog
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Drop the unused cv_bridge dependency (and with it, OpenCV)
+* Contributors: Jose Luis Blanco-Claraco
+
 4.1.0 (2026-11-01)
 ------------------
 
