@@ -70,21 +70,14 @@ sensor_msgs::msg::CameraInfo mrpt::ros2bridge::toROS(
   return ci;
 }
 
-mrpt::img::TCamera mrpt::ros2bridge::fromROS(const sensor_msgs::msg::CameraInfo& info)
+mrpt::img::TCamera mrpt::ros2bridge::fromROS(
+    const sensor_msgs::msg::CameraInfo& info, bool rectified)
 {
   namespace dm = sensor_msgs::distortion_models;
 
   const auto d = [&info](size_t i) { return i < info.d.size() ? info.d[i] : 0.0; };
 
-  // A rectified image (no distortion left) is described by P, a raw one by K.
-  bool rectified = info.p[0] > 0;
-  for (const double di : info.d)
-  {
-    if (di != 0)
-    {
-      rectified = false;
-    }
-  }
+  // A raw image is described by K and D, a rectified one by P (and no distortion).
   double fx = rectified ? info.p[0] : info.k[0];
   double fy = rectified ? info.p[5] : info.k[4];
   double cx = rectified ? info.p[2] : info.k[2];
@@ -112,7 +105,12 @@ mrpt::img::TCamera mrpt::ros2bridge::fromROS(const sensor_msgs::msg::CameraInfo&
   cam.nrows = height / by;
   cam.setIntrinsicParamsFromValues(fx, fy, cx, cy);
 
-  if (info.distortion_model == dm::PLUMB_BOB || info.distortion_model == dm::RATIONAL_POLYNOMIAL)
+  if (rectified)
+  {
+    cam.distortion = mrpt::img::DistortionModel::none;
+  }
+  else if (
+      info.distortion_model == dm::PLUMB_BOB || info.distortion_model == dm::RATIONAL_POLYNOMIAL)
   {
     cam.setDistortionPlumbBob(d(0), d(1), d(2), d(3), d(4));
     cam.k4(d(5));

@@ -45,7 +45,8 @@ namespace mrpt::ros2bridge
 
 /** Decodes a ROS depth image into millimeters (0: no measurement).
  *  Encodings: 16UC1 / mono16 (millimeters, REP 118) and 32FC1 (meters; NaN, inf and
- *  non-positive values are "no measurement", as published by e.g. ZED cameras).
+ *  non-positive values are "no measurement", as published by e.g. ZED cameras), in
+ *  either byte order.
  *  \exception std::exception On unsupported encodings or malformed images.
  */
 mrpt::math::CMatrix_u16 depthImageFromROS(const sensor_msgs::msg::Image& img);
@@ -59,20 +60,27 @@ mrpt::math::CMatrix_u16 depthImageFromROS(const sensor_msgs::msg::CompressedImag
 /** Intensity (color or gray) image of an RGB-D camera, as an 8-bit image.
  *  16-bit gray images (mono16 / 16UC1, e.g. time-of-flight infrared) are scaled by
  *  `scale16bit` and saturated at 255. Other encodings as in fromROS(Image).
+ *  \exception std::exception If `scale16bit` is negative or not finite.
  */
 mrpt::img::CImage intensityImageFromROS(
     const sensor_msgs::msg::Image& img, float scale16bit = 1.0f);
 
-/** Same, for a compressed (JPEG or PNG) intensity image.
- *  \exception std::exception If the image cannot be decoded.
+/** Same, for a compressed (JPEG or PNG) intensity image. 16-bit gray PNG images are
+ *  scaled to 8 bits as raw ones.
+ *  \exception std::exception If the image cannot be decoded, or `scale16bit` is negative
+ *  or not finite.
  */
-mrpt::img::CImage intensityImageFromROS(const sensor_msgs::msg::CompressedImage& img);
+mrpt::img::CImage intensityImageFromROS(
+    const sensor_msgs::msg::CompressedImage& img, float scale16bit = 1.0f);
 
 /** Default camera_info topic of an image topic: the "camera_info" sibling of the image,
  *  after removing any image_transport suffix (e.g. `/cam/depth/image_raw/compressedDepth`
  *  -> `/cam/depth/camera_info`).
  */
 std::string cameraInfoTopicFor(const std::string& imageTopic);
+
+/** Whether an image topic is rectified, by its name (`image_rect...`). */
+bool isRectifiedImageTopic(const std::string& imageTopic);
 
 /** Whether an image topic name ends in an image_transport compressed transport
  *  ("/compressed" or "/compressedDepth"), so its type is sensor_msgs/CompressedImage. */
@@ -113,6 +121,10 @@ class RgbdAssembler
     size_t maxQueueLength = 10;
     /** Scale of 16-bit intensity images into 8 bits (saturated) */
     float intensity16bitScale = 1.0f;
+    /** Whether the depth and intensity images are rectified: then their intrinsics come
+     *  from the camera_info P matrix, without distortion (see fromROS(CameraInfo)). */
+    bool depthRectified = false;
+    bool intensityRectified = false;
     mrpt::obs::CObservation3DRangeScan::TIntensityChannelID intensityChannel =
         mrpt::obs::CObservation3DRangeScan::CH_VISIBLE;
     /** If set, used as `sensorPose` instead of /tf (depth camera, +X forward) */
@@ -137,9 +149,13 @@ class RgbdAssembler
   Obs onIntensityImage(const sensor_msgs::msg::Image& img);
   Obs onIntensityImage(const sensor_msgs::msg::CompressedImage& img);
 
-  /** Images evicted from the waiting queues without a counterpart. */
+  /** Counts the images still waiting for a counterpart (e.g. at the end of a bag) as
+   *  dropped, and discards them. */
+  void dropPending();
+
+  /** Images discarded without a counterpart. */
   [[nodiscard]] size_t droppedUnpaired() const { return droppedUnpaired_; }
-  /** Frames dropped because their camera_info had not arrived yet. */
+  /** Images dropped because their camera_info had not arrived yet. */
   [[nodiscard]] size_t droppedWithoutCameraInfo() const { return droppedNoInfo_; }
   /** Frames dropped because a /tf transform was not available. */
   [[nodiscard]] size_t droppedWithoutTf() const { return droppedNoTf_; }
@@ -179,7 +195,11 @@ class RgbdAssembler
   /** Cached intensity-wrt-depth poses, by (depth frame, intensity frame) */
   std::map<std::pair<std::string, std::string>, mrpt::poses::CPose3D> intensityWrtDepth_;
 
+  /** Whether the camera_info of an image has arrived; if not, counts it as dropped. */
+  bool hasCameraInfo(bool isDepth);
   Obs onDepth(Frame&& f);
+  /** Drops (and counts) the waiting frames older than a stamp. */
+  void dropOlderThan(std::deque<Frame>& queue, double minStamp);
   Obs pairWith(Frame&& f, std::deque<Frame>& own, std::deque<Frame>& other, bool isDepth);
   /** nullptr if a camera_info or a /tf transform is still missing. */
   mrpt::obs::CObservation3DRangeScan::Ptr build(Frame&& depth, Frame* intensity);
@@ -204,6 +224,8 @@ struct RgbdTopics
  *    JPEG/PNG if it ends in `/compressed`).
  *  - `camera_info_topic`, `intensity_camera_info_topic` (optional): by default, the
  *    `camera_info` sibling of each image topic (cameraInfoTopicFor()).
+ *  - `rectified`, `intensity_rectified` (optional): whether each image is rectified, by
+ *    default from its topic name (isRectifiedImageTopic()).
  *  - `max_time_offset` [s], `max_range` [m], `max_queue_length`,
  *    `intensity_16bit_scale` and `intensity_channel` (`visible` or `ir`): see
  *    RgbdAssembler::Parameters.

@@ -484,6 +484,15 @@ class Transcriber
     return rets;
   };
 
+  /** At the end of the bag: frames still waiting for a counterpart are dropped too. */
+  void dropPendingRgbd()
+  {
+    for (const auto& a : m_rgbdAssemblers)
+    {
+      a->dropPending();
+    }
+  }
+
   /** Frames of the RGB-D sensors that could not be converted, and why. */
   void printRgbdStats() const
   {
@@ -604,6 +613,7 @@ int main(int argc, char** argv)
     }
 
     printf("\n");
+    t.dropPendingRgbd();
     t.printRgbdStats();
 
     reader.close();

@@ -401,10 +401,10 @@ TEST(RGBD, AssemblerPairsDepthAndColor)
   RgbdAssembler a(p, tf, "base_link");
 
   const std::vector<uint16_t> mm = {0, 1000, 1200, 1300, 1400, 1500};
-  // Before any camera_info: dropped and counted.
+  // Before any camera_info: each image is dropped and counted.
   EXPECT_TRUE(a.onDepthImage(depth16(mm, 3, 2, 0.9)).empty());
   EXPECT_TRUE(a.onIntensityImage(rgb8(6, 4, 0.901, "cam_color")).empty());
-  EXPECT_EQ(a.droppedWithoutCameraInfo(), 1U);
+  EXPECT_EQ(a.droppedWithoutCameraInfo(), 2U);
 
   a.onDepthCameraInfo(cameraInfo(3, 2, "cam_depth"));
   a.onIntensityCameraInfo(cameraInfo(6, 4, "cam_color"));
@@ -537,4 +537,173 @@ max_queue_length: 20
 
   EXPECT_ANY_THROW(mrpt::ros2bridge::rgbdSensorFromYaml(
       mrpt::containers::yaml::FromText("topic: /cam/depth\nintensity_channel: thermal"), "x"));
+}
+
+TEST(RGBD, RvlRejectsOverlongIntegers)
+{
+  // 1x1 image, then 16 nibbles with the continuation bit set: malformed.
+  std::vector<uint8_t> payload(8);
+  const uint32_t one = 1;
+  std::memcpy(payload.data(), &one, 4);
+  std::memcpy(payload.data() + 4, &one, 4);
+  const uint32_t continuation = 0x88888888;
+  for (int i = 0; i < 2; i++)
+  {
+    payload.resize(payload.size() + 4);
+    std::memcpy(payload.data() + payload.size() - 4, &continuation, 4);
+  }
+  EXPECT_ANY_THROW(
+      mrpt::ros2bridge::depthImageFromROS(compressedDepth("16UC1; compressedDepth rvl", payload)));
+}
+
+TEST(RGBD, RvlAllZeroFrame)
+{
+  // A frame without any depth return compresses to a single zero run:
+  const uint32_t w = 640;
+  const uint32_t h = 480;
+  const auto payload = rvl(std::vector<uint16_t>(static_cast<size_t>(w) * h, 0), w, h);
+  EXPECT_LT(payload.size(), 32U);
+  const auto out =
+      mrpt::ros2bridge::depthImageFromROS(compressedDepth("16UC1; compressedDepth rvl", payload));
+  ASSERT_EQ(out.cols(), 640);
+  ASSERT_EQ(out.rows(), 480);
+  EXPECT_EQ(out.maxCoeff(), 0);
+}
+
+TEST(RGBD, DepthImageBigEndian)
+{
+  sensor_msgs::msg::Image img;
+  img.width = 2;
+  img.height = 1;
+  img.is_bigendian = 1;
+  img.encoding = enc::TYPE_16UC1;
+  img.step = 4;
+  img.data = {0x03, 0xE8, 0x00, 0x07};  // 1000, 7
+  const auto d16 = mrpt::ros2bridge::depthImageFromROS(img);
+  EXPECT_EQ(d16(0, 0), 1000);
+  EXPECT_EQ(d16(0, 1), 7);
+
+  img.encoding = enc::TYPE_32FC1;
+  img.step = 8;
+  img.data = {0x3F, 0xC0, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00};  // 1.5f, 2.0f
+  const auto d32 = mrpt::ros2bridge::depthImageFromROS(img);
+  EXPECT_EQ(d32(0, 0), 1500);
+  EXPECT_EQ(d32(0, 1), 2000);
+}
+
+TEST(RGBD, DepthImageValidatedBeforeAllocating)
+{
+  sensor_msgs::msg::Image img;
+  img.width = 10000;
+  img.height = 10000;
+  img.encoding = enc::TYPE_16UC1;
+  img.step = 0;
+  EXPECT_ANY_THROW(mrpt::ros2bridge::depthImageFromROS(img));
+  img.step = 20000;  // a valid stride, but no data
+  EXPECT_ANY_THROW(mrpt::ros2bridge::depthImageFromROS(img));
+  img.encoding = "bgr8";
+  EXPECT_ANY_THROW(mrpt::ros2bridge::depthImageFromROS(img));
+}
+
+TEST(RGBD, IntensityScaleValidated)
+{
+  sensor_msgs::msg::Image img;
+  img.width = 1;
+  img.height = 1;
+  img.encoding = enc::MONO16;
+  img.step = 2;
+  img.data = {10, 0};
+  EXPECT_ANY_THROW(mrpt::ros2bridge::intensityImageFromROS(img, -1.0f));
+  EXPECT_ANY_THROW(
+      mrpt::ros2bridge::intensityImageFromROS(img, std::numeric_limits<float>::quiet_NaN()));
+  EXPECT_EQ(mrpt::ros2bridge::intensityImageFromROS(img, 0.0f).at<uint8_t>(0, 0), 0);
+
+  RgbdAssembler::Parameters p;
+  p.intensity16bitScale = -2.0f;
+  p.fixedSensorPose = mrpt::poses::CPose3D();
+  EXPECT_ANY_THROW(RgbdAssembler(p, nullptr, "base_link"));
+}
+
+TEST(RGBD, CompressedIntensity16BitPng)
+{
+  sensor_msgs::msg::CompressedImage msg;
+  msg.format = "mono16; png compressed";
+  msg.data = png16({10, 200, 3000}, 3, 1);
+  const auto out = mrpt::ros2bridge::intensityImageFromROS(msg, 0.5f);
+  ASSERT_FALSE(out.isColor());
+  EXPECT_EQ(out.getPixelDepth(), mrpt::img::PixelDepth::D8U);
+  EXPECT_EQ(out.at<uint8_t>(0, 0), 5);
+  EXPECT_EQ(out.at<uint8_t>(1, 0), 100);
+  EXPECT_EQ(out.at<uint8_t>(2, 0), 255);  // saturated
+}
+
+TEST(RGBD, AssemblerDropsImagesBeforeTheirCameraInfo)
+{
+  auto tf = std::make_shared<tf2::BufferCore>();
+  addStaticTf(*tf, "base_link", "cam", 0.0, 0.0, 0.5);
+  RgbdAssembler::Parameters p;
+  RgbdAssembler a(p, tf, "base_link");
+  const std::vector<uint16_t> mm(6, 1000);
+
+  // Depth before its camera_info is dropped, even if the intensity one comes in time:
+  EXPECT_TRUE(a.onDepthImage(depth16(mm, 3, 2, 1.0, "cam")).empty());
+  a.onDepthCameraInfo(cameraInfo(3, 2, "cam"));
+  a.onIntensityCameraInfo(cameraInfo(3, 2, "cam"));
+  EXPECT_TRUE(a.onIntensityImage(rgb8(3, 2, 1.0, "cam")).empty());
+  EXPECT_EQ(a.droppedWithoutCameraInfo(), 1U);
+
+  // A depth image after its camera_info waits for its intensity image:
+  EXPECT_TRUE(a.onDepthImage(depth16(mm, 3, 2, 2.0, "cam")).empty());
+  EXPECT_EQ(a.onIntensityImage(rgb8(3, 2, 2.0, "cam")).size(), 1U);
+}
+
+TEST(RGBD, AssemblerKeepsFramesThatCanStillPair)
+{
+  auto tf = std::make_shared<tf2::BufferCore>();
+  addStaticTf(*tf, "base_link", "cam", 0.0, 0.0, 0.5);
+  RgbdAssembler::Parameters p;
+  p.maxTimeOffset = 0.010;
+  RgbdAssembler a(p, tf, "base_link");
+  a.onDepthCameraInfo(cameraInfo(3, 2, "cam"));
+  a.onIntensityCameraInfo(cameraInfo(3, 2, "cam"));
+  const std::vector<uint16_t> mm(6, 1000);
+
+  // Depth at 0 and 9 ms; intensity at 8 ms takes the 9 ms one, and intensity at
+  // 9.5 ms can still pair with the 0 ms depth.
+  EXPECT_TRUE(a.onDepthImage(depth16(mm, 3, 2, 10.000, "cam")).empty());
+  EXPECT_TRUE(a.onDepthImage(depth16(mm, 3, 2, 10.009, "cam")).empty());
+  EXPECT_EQ(a.onIntensityImage(rgb8(3, 2, 10.008, "cam")).size(), 1U);
+  EXPECT_EQ(a.onIntensityImage(rgb8(3, 2, 10.0095, "cam")).size(), 1U);
+  EXPECT_EQ(a.droppedUnpaired(), 0U);
+
+  // A frame that can no longer pair is dropped and counted when a match happens:
+  EXPECT_TRUE(a.onDepthImage(depth16(mm, 3, 2, 20.000, "cam")).empty());
+  EXPECT_TRUE(a.onDepthImage(depth16(mm, 3, 2, 20.030, "cam")).empty());
+  EXPECT_EQ(a.onIntensityImage(rgb8(3, 2, 20.030, "cam")).size(), 1U);
+  EXPECT_EQ(a.droppedUnpaired(), 1U);
+
+  // At the end of a stream, frames still waiting are dropped and counted too:
+  EXPECT_TRUE(a.onDepthImage(depth16(mm, 3, 2, 30.000, "cam")).empty());
+  a.dropPending();
+  EXPECT_EQ(a.droppedUnpaired(), 2U);
+  EXPECT_TRUE(a.onIntensityImage(rgb8(3, 2, 30.000, "cam")).empty());
+}
+
+TEST(RGBD, SensorFromYamlRectified)
+{
+  using mrpt::ros2bridge::rgbdSensorFromYaml;
+  const auto [t1, p1] = rgbdSensorFromYaml(
+      mrpt::containers::yaml::FromText(
+          "topic: /rs/depth/image_rect_raw\nintensity_topic: /rs/color/image_raw"),
+      "rs");
+  EXPECT_TRUE(p1.depthRectified);
+  EXPECT_FALSE(p1.intensityRectified);
+
+  const auto [t2, p2] = rgbdSensorFromYaml(
+      mrpt::containers::yaml::FromText(
+          "topic: /zed/depth/depth_registered\nrectified: true\n"
+          "intensity_topic: /zed/rgb/image\nintensity_rectified: true"),
+      "zed");
+  EXPECT_TRUE(p2.depthRectified);
+  EXPECT_TRUE(p2.intensityRectified);
 }

@@ -16,6 +16,7 @@
 #include <mrpt/ros2bridge/time.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -34,6 +35,34 @@ namespace
 double stampOf(const std_msgs::msg::Header& h)
 {
   return static_cast<double>(h.stamp.sec) + 1e-9 * static_cast<double>(h.stamp.nanosec);
+}
+
+// Bounds for the dimensions read from compressed images, so corrupted data cannot
+// request huge allocations:
+constexpr uint32_t kMaxImageSide = 1U << 16;
+constexpr uint64_t kMaxImagePixels = 1ULL << 26;
+
+// Whether samples in the given byte order must be swapped on this host:
+bool needsByteSwap(bool bigEndianData)
+{
+  const uint16_t one = 1;
+  uint8_t firstByte = 0;
+  std::memcpy(&firstByte, &one, 1);
+  const bool hostIsBigEndian = firstByte == 0;
+  return bigEndianData != hostIsBigEndian;
+}
+
+// A 16-bit intensity sample to 8 bits, scaled and saturated:
+uint8_t scaleTo8bits(uint16_t v, float scale)
+{
+  return static_cast<uint8_t>(std::min(255.0f, static_cast<float>(v) * scale));
+}
+
+void checkIntensityScale(float scale)
+{
+  ASSERTMSG_(
+      std::isfinite(scale) && scale >= 0,
+      "The 16-bit intensity scale must be finite and non-negative");
 }
 
 // Depth in meters to millimeters, 0 for "no measurement":
@@ -66,6 +95,7 @@ class RvlReader
         nibblesLeft_ = 8;
       }
       nibble = word_ & 0xf0000000;
+      ASSERTMSG_(bits >= 0, "Malformed RVL depth image");
       value |= static_cast<int>((nibble << 1) >> bits);
       word_ <<= 4;
       nibblesLeft_--;
@@ -92,9 +122,10 @@ CMatrix_u16 decodeRVL(const uint8_t* data, size_t length)
   std::memcpy(&cols, data, 4);
   std::memcpy(&rows, data + 4, 4);
   const uint64_t numPixels = static_cast<uint64_t>(rows) * cols;
-  // The best RVL compression ratio is ~4x: larger sizes mean corrupted data.
+  // Zero runs compress to a few bits, so the payload size does not bound the image:
   ASSERTMSG_(
-      rows > 0 && cols > 0 && numPixels <= 10 * static_cast<uint64_t>(length),
+      rows > 0 && cols > 0 && rows <= kMaxImageSide && cols <= kMaxImageSide &&
+          numPixels <= kMaxImagePixels,
       "Malformed RVL depth image");
 
   CMatrix_u16 out(static_cast<int>(rows), static_cast<int>(cols));
@@ -144,42 +175,52 @@ CMatrix_u16 depthImageFromROS(const sensor_msgs::msg::Image& img)
 {
   namespace enc = sensor_msgs::image_encodings;
 
-  const auto h = static_cast<int>(img.height);
-  const auto w = static_cast<int>(img.width);
-  ASSERTMSG_(!img.is_bigendian, "Big-endian depth images are not supported");
-
-  CMatrix_u16 out(h, w);
-  if (img.encoding == enc::TYPE_16UC1 || img.encoding == enc::MONO16)
-  {
-    ASSERT_GE_(img.step, img.width * sizeof(uint16_t));
-    ASSERT_GE_(img.data.size(), static_cast<size_t>(img.step) * img.height);
-    for (int r = 0; r < h; r++)
-    {
-      std::memcpy(
-          &out(r, 0), img.data.data() + static_cast<size_t>(r) * img.step,
-          sizeof(uint16_t) * img.width);
-    }
-  }
-  else if (img.encoding == enc::TYPE_32FC1)
-  {
-    ASSERT_GE_(img.step, img.width * sizeof(float));
-    ASSERT_GE_(img.data.size(), static_cast<size_t>(img.step) * img.height);
-    for (int r = 0; r < h; r++)
-    {
-      const uint8_t* row = img.data.data() + static_cast<size_t>(r) * img.step;
-      for (int c = 0; c < w; c++)
-      {
-        float d = 0;
-        std::memcpy(&d, row + sizeof(float) * static_cast<size_t>(c), sizeof(float));
-        out(r, c) = metersToMillimeters(d);
-      }
-    }
-  }
-  else
+  const bool is16bit = img.encoding == enc::TYPE_16UC1 || img.encoding == enc::MONO16;
+  if (!is16bit && img.encoding != enc::TYPE_32FC1)
   {
     THROW_EXCEPTION_FMT(
         "Unsupported depth image encoding '%s' (expected 16UC1, mono16 or 32FC1)",
         img.encoding.c_str());
+  }
+  // Validate the payload before allocating (rows may be padded):
+  const uint64_t bytesPerPixel = is16bit ? sizeof(uint16_t) : sizeof(float);
+  ASSERTMSG_(img.width <= kMaxImageSide && img.height <= kMaxImageSide, "Depth image is too large");
+  ASSERT_GE_(static_cast<uint64_t>(img.step), bytesPerPixel * img.width);
+  ASSERT_GE_(static_cast<uint64_t>(img.data.size()), static_cast<uint64_t>(img.step) * img.height);
+
+  const auto h = static_cast<int>(img.height);
+  const auto w = static_cast<int>(img.width);
+  const bool swap = needsByteSwap(img.is_bigendian != 0);
+  CMatrix_u16 out(h, w);
+  for (int r = 0; r < h; r++)
+  {
+    const uint8_t* row = img.data.data() + static_cast<size_t>(r) * img.step;
+    if (is16bit && !swap)
+    {
+      std::memcpy(&out(r, 0), row, sizeof(uint16_t) * img.width);
+      continue;
+    }
+    for (int c = 0; c < w; c++)
+    {
+      std::array<uint8_t, sizeof(float)> b{};
+      std::memcpy(b.data(), row + bytesPerPixel * static_cast<size_t>(c), bytesPerPixel);
+      if (swap)
+      {
+        std::reverse(b.begin(), b.begin() + static_cast<std::ptrdiff_t>(bytesPerPixel));
+      }
+      if (is16bit)
+      {
+        uint16_t v = 0;
+        std::memcpy(&v, b.data(), sizeof(v));
+        out(r, c) = v;
+      }
+      else
+      {
+        float d = 0;
+        std::memcpy(&d, b.data(), sizeof(d));
+        out(r, c) = metersToMillimeters(d);
+      }
+    }
   }
   return out;
 }
@@ -232,6 +273,7 @@ CMatrix_u16 depthImageFromROS(const sensor_msgs::msg::CompressedImage& img)
 mrpt::img::CImage intensityImageFromROS(const sensor_msgs::msg::Image& img, float scale16bit)
 {
   namespace enc = sensor_msgs::image_encodings;
+  checkIntensityScale(scale16bit);
   if (img.encoding != enc::MONO16 && img.encoding != enc::TYPE_16UC1)
   {
     return fromROS(img);
@@ -251,18 +293,40 @@ mrpt::img::CImage intensityImageFromROS(const sensor_msgs::msg::Image& img, floa
       const uint8_t* px = row + 2 * static_cast<size_t>(c);
       const uint16_t v = img.is_bigendian ? static_cast<uint16_t>((px[0] << 8) | px[1])
                                           : static_cast<uint16_t>((px[1] << 8) | px[0]);
-      dst[c] = static_cast<uint8_t>(std::min(255.0f, static_cast<float>(v) * scale16bit));
+      dst[c] = scaleTo8bits(v, scale16bit);
     }
   }
   return out;
 }
 
-mrpt::img::CImage intensityImageFromROS(const sensor_msgs::msg::CompressedImage& img)
+mrpt::img::CImage intensityImageFromROS(
+    const sensor_msgs::msg::CompressedImage& img, float scale16bit)
 {
-  auto out = fromROS(img);
+  checkIntensityScale(scale16bit);
+  auto decoded = fromROS(img);
   ASSERTMSG_(
-      out.getWidth() > 0,
+      decoded.getWidth() > 0,
       "Cannot decode the compressed intensity image (format: '" + img.format + "')");
+  if (decoded.getPixelDepth() != mrpt::img::PixelDepth::D16U)
+  {
+    return decoded;
+  }
+  // 16-bit PNG: to 8 bits, as raw 16-bit images.
+  ASSERTMSG_(
+      !decoded.isColor(),
+      "16-bit color compressed intensity images are not supported (format: '" + img.format + "')");
+  const int32_t w = decoded.getWidth();
+  const int32_t h = decoded.getHeight();
+  mrpt::img::CImage out(w, h, mrpt::img::CH_GRAY);
+  for (int32_t r = 0; r < h; r++)
+  {
+    const auto* src = decoded.ptrLine<uint16_t>(r);
+    auto* dst = out.ptrLine<uint8_t>(r);
+    for (int32_t c = 0; c < w; c++)
+    {
+      dst[c] = scaleTo8bits(src[c], scale16bit);
+    }
+  }
   return out;
 }
 
@@ -280,6 +344,11 @@ std::string cameraInfoTopicFor(const std::string& imageTopic)
   }
   const auto pos = t.find_last_of('/');
   return (pos == std::string::npos ? std::string() : t.substr(0, pos + 1)) + "camera_info";
+}
+
+bool isRectifiedImageTopic(const std::string& imageTopic)
+{
+  return imageTopic.find("image_rect") != std::string::npos;
 }
 
 bool isCompressedImageTopic(const std::string& imageTopic)
@@ -317,6 +386,10 @@ std::pair<RgbdTopics, RgbdAssembler::Parameters> rgbdSensorFromYaml(
   p.maxQueueLength = sensor.getOrDefault<size_t>("max_queue_length", p.maxQueueLength);
   p.intensity16bitScale =
       sensor.getOrDefault<float>("intensity_16bit_scale", p.intensity16bitScale);
+  p.depthRectified = sensor.getOrDefault<bool>("rectified", isRectifiedImageTopic(t.depth));
+  p.intensityRectified =
+      !t.intensity.empty() &&
+      sensor.getOrDefault<bool>("intensity_rectified", isRectifiedImageTopic(t.intensity));
   const auto channel = sensor.getOrDefault<std::string>("intensity_channel", "visible");
   ASSERTMSG_(
       channel == "visible" || channel == "ir",
@@ -342,43 +415,70 @@ RgbdAssembler::RgbdAssembler(
 {
   ASSERT_(tf_ || params_.fixedSensorPose);
   ASSERT_GT_(params_.maxQueueLength, 0U);
+  checkIntensityScale(params_.intensity16bitScale);
 }
 
 void RgbdAssembler::onDepthCameraInfo(const sensor_msgs::msg::CameraInfo& info)
 {
-  depthCamera_ = fromROS(info);
+  depthCamera_ = fromROS(info, params_.depthRectified);
 }
 
 void RgbdAssembler::onIntensityCameraInfo(const sensor_msgs::msg::CameraInfo& info)
 {
-  intensityCamera_ = fromROS(info);
+  intensityCamera_ = fromROS(info, params_.intensityRectified);
+}
+
+bool RgbdAssembler::hasCameraInfo(bool isDepth)
+{
+  // Drivers usually publish camera_info after the first images:
+  if (isDepth ? depthCamera_.has_value() : intensityCamera_.has_value())
+  {
+    return true;
+  }
+  droppedNoInfo_++;
+  return false;
 }
 
 RgbdAssembler::Obs RgbdAssembler::onDepthImage(const sensor_msgs::msg::Image& img)
 {
+  if (!hasCameraInfo(true))
+  {
+    return {};
+  }
   return onDepth({stampOf(img.header), img.header, depthImageFromROS(img), {}});
 }
 
 RgbdAssembler::Obs RgbdAssembler::onDepthImage(const sensor_msgs::msg::CompressedImage& img)
 {
+  if (!hasCameraInfo(true))
+  {
+    return {};
+  }
   return onDepth({stampOf(img.header), img.header, depthImageFromROS(img), {}});
 }
 
 RgbdAssembler::Obs RgbdAssembler::onIntensityImage(const sensor_msgs::msg::Image& img)
 {
+  if (!hasCameraInfo(false))
+  {
+    return {};
+  }
   return pairWith(
-      {stampOf(img.header),
-       img.header,
-       {},
+      {stampOf(img.header), img.header, CMatrix_u16(),
        intensityImageFromROS(img, params_.intensity16bitScale)},
       intensityQueue_, depthQueue_, false);
 }
 
 RgbdAssembler::Obs RgbdAssembler::onIntensityImage(const sensor_msgs::msg::CompressedImage& img)
 {
+  if (!hasCameraInfo(false))
+  {
+    return {};
+  }
   return pairWith(
-      {stampOf(img.header), img.header, {}, intensityImageFromROS(img)}, intensityQueue_,
-      depthQueue_, false);
+      {stampOf(img.header), img.header, CMatrix_u16(),
+       intensityImageFromROS(img, params_.intensity16bitScale)},
+      intensityQueue_, depthQueue_, false);
 }
 
 RgbdAssembler::Obs RgbdAssembler::onDepth(Frame&& f)
@@ -428,15 +528,37 @@ RgbdAssembler::Obs RgbdAssembler::pairWith(
   }
 
   Frame match = std::move(*best);
-  // Streams arrive in time order: older entries can no longer be paired.
-  other.erase(other.begin(), best + 1);
-  while (!own.empty() && own.front().stamp <= t)
-  {
-    own.pop_front();
-  }
+  other.erase(best);
+  // Streams arrive in time order: later frames of this stream come after `t`, and those
+  // of the other one after the match. Drop the waiting frames that can no longer pair.
+  dropOlderThan(other, t - params_.maxTimeOffset);
+  dropOlderThan(own, match.stamp - params_.maxTimeOffset);
 
   auto obs = isDepth ? build(std::move(f), &match) : build(std::move(match), &f);
   return obs ? Obs{obs} : Obs{};
+}
+
+void RgbdAssembler::dropOlderThan(std::deque<Frame>& queue, double minStamp)
+{
+  for (auto it = queue.begin(); it != queue.end();)
+  {
+    if (it->stamp < minStamp)
+    {
+      it = queue.erase(it);
+      droppedUnpaired_++;
+    }
+    else
+    {
+      ++it;
+    }
+  }
+}
+
+void RgbdAssembler::dropPending()
+{
+  droppedUnpaired_ += depthQueue_.size() + intensityQueue_.size();
+  depthQueue_.clear();
+  intensityQueue_.clear();
 }
 
 std::optional<mrpt::poses::CPose3D> RgbdAssembler::lookupPose(
@@ -463,7 +585,6 @@ std::optional<mrpt::poses::CPose3D> RgbdAssembler::lookupPose(
 
 mrpt::obs::CObservation3DRangeScan::Ptr RgbdAssembler::build(Frame&& depth, Frame* intensity)
 {
-  // Drivers usually publish camera_info after the first images:
   if (!depthCamera_ || (intensity != nullptr && !intensityCamera_))
   {
     droppedNoInfo_++;

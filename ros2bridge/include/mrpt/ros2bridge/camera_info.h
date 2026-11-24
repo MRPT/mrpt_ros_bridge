@@ -30,12 +30,13 @@ sensor_msgs::msg::CameraInfo toROS(
     const mrpt::img::TCamera& cam, const std_msgs::msg::Header& msg_header);
 
 /** ROS->MRPT: sensor_msgs/CameraInfo to camera intrinsics and distortion, for the images
- *  that come with it: the ROI and binning are applied, and rectified images (all distortion
- *  coefficients zero) take their intrinsics from P instead of K.
- *  Unknown distortion models with non-zero coefficients are returned as `none`.
+ *  that come with it, with the ROI and binning applied.
+ *  \param rectified Whether those images are rectified (e.g. an `image_rect` topic): then
+ *  their intrinsics are taken from P and there is no distortion. Otherwise (raw images),
+ *  from K and D. Unknown distortion models of raw images are returned as `none`.
  *  \sa toROS
  */
-mrpt::img::TCamera fromROS(const sensor_msgs::msg::CameraInfo& info);
+mrpt::img::TCamera fromROS(const sensor_msgs::msg::CameraInfo& info, bool rectified = false);
 
 /** @} */
 

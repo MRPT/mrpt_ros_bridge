@@ -86,7 +86,7 @@ TEST(CameraInfo, RectifiedRoiAndBinning)
   ci.height = 720;
   ci.distortion_model = "plumb_bob";
   ci.d = {0, 0, 0, 0, 0};
-  // Rectified image: P, not K, describes it.
+  // Rectified images: P, not K, describes them.
   ci.k = {700, 0, 640, 0, 700, 360, 0, 0, 1};
   ci.p = {650, 0, 630, 0, 0, 650, 350, 0, 0, 0, 1, 0};
   ci.roi.x_offset = 100;
@@ -96,7 +96,7 @@ TEST(CameraInfo, RectifiedRoiAndBinning)
   ci.binning_x = 2;
   ci.binning_y = 2;
 
-  const auto cam = mrpt::ros2bridge::fromROS(ci);
+  const auto cam = mrpt::ros2bridge::fromROS(ci, true);
   EXPECT_EQ(cam.ncols, 400U);
   EXPECT_EQ(cam.nrows, 300U);
   EXPECT_DOUBLE_EQ(cam.fx(), 325.0);
@@ -104,13 +104,23 @@ TEST(CameraInfo, RectifiedRoiAndBinning)
   EXPECT_DOUBLE_EQ(cam.cx(), (630.0 - 100.0) / 2);
   EXPECT_DOUBLE_EQ(cam.cy(), (350.0 - 50.0) / 2);
 
-  // With distortion, K describes the (raw) image:
-  ci.d[0] = 0.1;
+  // Raw images are described by K, even without distortion:
   ci.roi = sensor_msgs::msg::RegionOfInterest();
   ci.binning_x = 0;
   ci.binning_y = 0;
+  const auto rawNoDistortion = mrpt::ros2bridge::fromROS(ci);
+  EXPECT_EQ(rawNoDistortion.ncols, 1280U);
+  EXPECT_DOUBLE_EQ(rawNoDistortion.fx(), 700.0);
+  EXPECT_DOUBLE_EQ(rawNoDistortion.cx(), 640.0);
+
+  ci.d[0] = 0.1;
   const auto raw = mrpt::ros2bridge::fromROS(ci);
-  EXPECT_EQ(raw.ncols, 1280U);
   EXPECT_DOUBLE_EQ(raw.fx(), 700.0);
-  EXPECT_DOUBLE_EQ(raw.cx(), 640.0);
+  EXPECT_DOUBLE_EQ(raw.k1(), 0.1);
+
+  // Rectified images of a camera with distortion: P, and no distortion left.
+  const auto rect = mrpt::ros2bridge::fromROS(ci, true);
+  EXPECT_DOUBLE_EQ(rect.fx(), 650.0);
+  EXPECT_DOUBLE_EQ(rect.cx(), 630.0);
+  EXPECT_EQ(rect.distortion, mrpt::img::DistortionModel::none);
 }
