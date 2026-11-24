@@ -2,6 +2,16 @@
 Changelog for package mrpt_libros_bridge
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+4.2.0 (2026-11-23)
+------------------
+* New MRPT <-> ROS conversions: CameraInfo <-> TCamera, CompressedImage <-> CImage, CObservationOdometry -> nav_msgs/Odometry
+* toROS() fixes for IMU (orientation from yaw/pitch/roll, diagonal covariances), LaserScan (invalid rays as +inf, clockwise scans, intensities) and NavSatFix (RTK fix status)
+* Fix PoseWithCovariance <-> CPose3DPDFGaussian rotation covariance conversion (`#15 <https://github.com/MRPT/mrpt_ros_bridge/issues/15>`_)
+* Fix fromROS(LaserScan) ray index mapping, and derive its aperture from angle_increment (`#16 <https://github.com/MRPT/mrpt_ros_bridge/issues/16>`_)
+* rosbag2To*() converters: deserialize in place without copying the message payload (~30% faster), reject empty payloads, and add unit tests
+* Drop the unused cv_bridge dependency
+* Contributors: Jose Luis Blanco-Claraco
+
 4.1.0 (2026-11-01)
 ------------------
 * fromROS(Image): demosaic 8-bit Bayer images (bayer_rggb8, ...) with CImage::loadFromBayerBuffer() (`#14 <https://github.com/MRPT/mrpt_ros_bridge/issues/14>`_)

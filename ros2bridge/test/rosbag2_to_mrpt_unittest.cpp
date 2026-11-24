@@ -48,7 +48,7 @@ rosbag2_storage::SerializedBagMessage toBagMessage(const MSG& msg, const std::st
       new rcutils_uint8_array_t(serialized.release_rcl_serialized_message()),
       [](rcutils_uint8_array_t* p)
       {
-        (void)rcutils_uint8_array_fini(p);
+        [[maybe_unused]] const rcutils_ret_t ret = rcutils_uint8_array_fini(p);
         delete p;
       });
   return m;
