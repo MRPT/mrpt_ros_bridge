@@ -9,6 +9,7 @@
 
 #include <mrpt/ros2bridge/camera_info.h>
 
+#include <algorithm>
 #include <sensor_msgs/distortion_models.hpp>
 
 sensor_msgs::msg::CameraInfo mrpt::ros2bridge::toROS(
@@ -69,18 +70,47 @@ sensor_msgs::msg::CameraInfo mrpt::ros2bridge::toROS(
   return ci;
 }
 
-mrpt::img::TCamera mrpt::ros2bridge::fromROS(const sensor_msgs::msg::CameraInfo& info)
+mrpt::img::TCamera mrpt::ros2bridge::fromROS(
+    const sensor_msgs::msg::CameraInfo& info, bool rectified)
 {
   namespace dm = sensor_msgs::distortion_models;
 
-  mrpt::img::TCamera cam;
-  cam.ncols = info.width;
-  cam.nrows = info.height;
-  cam.setIntrinsicParamsFromValues(info.k[0], info.k[4], info.k[2], info.k[5]);
-
   const auto d = [&info](size_t i) { return i < info.d.size() ? info.d[i] : 0.0; };
 
-  if (info.distortion_model == dm::PLUMB_BOB || info.distortion_model == dm::RATIONAL_POLYNOMIAL)
+  // A raw image is described by K and D, a rectified one by P (and no distortion).
+  double fx = rectified ? info.p[0] : info.k[0];
+  double fy = rectified ? info.p[5] : info.k[4];
+  double cx = rectified ? info.p[2] : info.k[2];
+  double cy = rectified ? info.p[6] : info.k[5];
+
+  // The calibration is for the full sensor resolution: apply the ROI, then the binning.
+  uint32_t width = info.width;
+  uint32_t height = info.height;
+  if (info.roi.width > 0 && info.roi.height > 0)
+  {
+    cx -= info.roi.x_offset;
+    cy -= info.roi.y_offset;
+    width = info.roi.width;
+    height = info.roi.height;
+  }
+  const uint32_t bx = std::max<uint32_t>(info.binning_x, 1);
+  const uint32_t by = std::max<uint32_t>(info.binning_y, 1);
+  fx /= bx;
+  cx /= bx;
+  fy /= by;
+  cy /= by;
+
+  mrpt::img::TCamera cam;
+  cam.ncols = width / bx;
+  cam.nrows = height / by;
+  cam.setIntrinsicParamsFromValues(fx, fy, cx, cy);
+
+  if (rectified)
+  {
+    cam.distortion = mrpt::img::DistortionModel::none;
+  }
+  else if (
+      info.distortion_model == dm::PLUMB_BOB || info.distortion_model == dm::RATIONAL_POLYNOMIAL)
   {
     cam.setDistortionPlumbBob(d(0), d(1), d(2), d(3), d(4));
     cam.k4(d(5));

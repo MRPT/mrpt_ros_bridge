@@ -32,6 +32,7 @@
 #include <mrpt/ros2bridge/laser_scan.h>
 #include <mrpt/ros2bridge/point_cloud2.h>
 #include <mrpt/ros2bridge/pose.h>
+#include <mrpt/ros2bridge/rgbd.h>
 #include <mrpt/ros2bridge/ros_to_mrpt_obs.h>  // lookupSensorPose, fixLivox…
 #include <mrpt/ros2bridge/rosbag2_to_mrpt.h>
 #include <mrpt/ros2bridge/time.h>
@@ -45,6 +46,8 @@
 #include <rosbag2_cpp/readers/sequential_reader.hpp>
 #include <rosbag2_storage/serialized_bag_message.hpp>
 #include <rosidl_typesupport_cpp/message_type_support.hpp>
+#include <sensor_msgs/msg/camera_info.hpp>
+#include <sensor_msgs/msg/compressed_image.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
@@ -290,6 +293,56 @@ ObsVector rosbag2ToImage(
   }
 
   return {imgObs};
+}
+
+// -----------------------------------------------------------------------
+//  rosbag2ToRgbd
+// -----------------------------------------------------------------------
+ObsVector rosbag2ToRgbd(
+    RgbdAssembler& assembler,
+    RgbdTopic topic,
+    bool compressed,
+    const rosbag2_storage::SerializedBagMessage& rosmsg,
+    std_msgs::msg::Header* imageHeader)
+{
+  if (topic == RgbdTopic::DepthCameraInfo || topic == RgbdTopic::IntensityCameraInfo)
+  {
+    sensor_msgs::msg::CameraInfo info;
+    deserializeBagMessage(rosmsg, info);
+    if (topic == RgbdTopic::DepthCameraInfo)
+    {
+      assembler.onDepthCameraInfo(info);
+    }
+    else
+    {
+      assembler.onIntensityCameraInfo(info);
+    }
+    return {};
+  }
+
+  const bool isDepth = topic == RgbdTopic::Depth;
+  RgbdAssembler::Obs obs;
+  if (compressed)
+  {
+    sensor_msgs::msg::CompressedImage img;
+    deserializeBagMessage(rosmsg, img);
+    if (imageHeader != nullptr)
+    {
+      *imageHeader = img.header;
+    }
+    obs = isDepth ? assembler.onDepthImage(img) : assembler.onIntensityImage(img);
+  }
+  else
+  {
+    sensor_msgs::msg::Image img;
+    deserializeBagMessage(rosmsg, img);
+    if (imageHeader != nullptr)
+    {
+      *imageHeader = img.header;
+    }
+    obs = isDepth ? assembler.onDepthImage(img) : assembler.onIntensityImage(img);
+  }
+  return {obs.begin(), obs.end()};
 }
 
 // -----------------------------------------------------------------------
