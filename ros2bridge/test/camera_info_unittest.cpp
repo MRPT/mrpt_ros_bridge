@@ -48,11 +48,12 @@ TEST(CameraInfo, RationalAndFisheye)
   mrpt::img::TCamera c;
   c.setDistortionPlumbBob(0.1, 0.2, 0.3, 0.4, 0.5);
   c.k6(0.6);
-  EXPECT_EQ(mrpt::ros2bridge::toROS(c, {}).distortion_model, "rational_polynomial");
+  EXPECT_EQ(
+      mrpt::ros2bridge::toROS(c, std_msgs::msg::Header()).distortion_model, "rational_polynomial");
   EXPECT_DOUBLE_EQ(roundTrip(c).k6(), 0.6);
 
   c.setDistortionKannalaBrandt(0.1, 0.2, 0.3, 0.4);
-  const auto ci = mrpt::ros2bridge::toROS(c, {});
+  const auto ci = mrpt::ros2bridge::toROS(c, std_msgs::msg::Header());
   EXPECT_EQ(ci.distortion_model, "equidistant");
   ASSERT_EQ(ci.d.size(), 4u);
   const auto c2 = roundTrip(c);
