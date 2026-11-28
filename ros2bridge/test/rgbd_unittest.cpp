@@ -688,6 +688,7 @@ TEST(RGBD, AssemblerKeepsFramesThatCanStillPair)
   EXPECT_TRUE(a.onDepthImage(depth16(mm, 3, 2, 30.000, "cam")).empty());
   a.dropPending();
   EXPECT_EQ(a.droppedUnpaired(), 2U);
+  EXPECT_TRUE(std::isinf(a.lastEvictedClosestDt()));  // no counterpart came while it waited
   EXPECT_TRUE(a.onIntensityImage(rgb8(3, 2, 30.000, "cam")).empty());
 }
 

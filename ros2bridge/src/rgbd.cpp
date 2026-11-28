@@ -555,6 +555,19 @@ void RgbdAssembler::dropOlderThan(std::deque<Frame>& queue, double minStamp)
 
 void RgbdAssembler::dropPending()
 {
+  // Reported as the last evicted frame: the most recent one of both queues.
+  const Frame* newest = nullptr;
+  for (const auto* queue : {&depthQueue_, &intensityQueue_})
+  {
+    if (!queue->empty() && (!newest || queue->back().stamp > newest->stamp))
+    {
+      newest = &queue->back();
+    }
+  }
+  if (newest)
+  {
+    lastEvictedClosestDt_ = newest->closestDt;
+  }
   droppedUnpaired_ += depthQueue_.size() + intensityQueue_.size();
   depthQueue_.clear();
   intensityQueue_.clear();

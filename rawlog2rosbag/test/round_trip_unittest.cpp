@@ -32,6 +32,7 @@
 #include <mrpt/system/filesystem.h>
 
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <map>
 #include <nav_msgs/msg/odometry.hpp>
@@ -515,6 +516,15 @@ TEST(rawlog2rosbag, RgbdRoundTrip)
     EXPECT_EQ(o.rangeImage(1, 4), 1021);  // round((5000 + 100 + 4) * 0.2)
     EXPECT_EQ(o.intensityImage.getWidth(), 16);
     EXPECT_EQ(o.intensityImage.getHeight(), 12);
-    EXPECT_EQ(o.intensityImage.ptrLine<uint8_t>(4)[3 * 3 + 1], 20);  // green, as RGB or BGR
+    ASSERT_TRUE(o.intensityImage.isColor());
+    for (int r = 0; r < 12; r++)
+    {
+      EXPECT_EQ(
+          std::memcmp(
+              o.intensityImage.ptrLine<uint8_t>(r), ref->intensityImage.ptrLine<uint8_t>(r),
+              16 * 3),
+          0)
+          << "intensity row " << r;
+    }
   }
 }
