@@ -133,14 +133,19 @@ written to `/lms_sick_left/scan` in frame `lms_sick_left`):
 | `CObservationGPS` | `<ns>/fix` (`sensor_msgs/NavSatFix`) |
 | `CObservationImage` | `<ns>/image_raw/compressed` + `<ns>/camera_info` (`--image-mode raw` for `<ns>/image_raw`) |
 | `CObservationStereoImages` | the same, under `<ns>/left` and `<ns>/right` |
+| `CObservation3DRangeScan` with a depth image | `<ns>/depth/image_raw` (16UC1, mm) + `<ns>/depth/camera_info`, and the intensity image as a `CObservationImage` under `<ns>/color` (`<ns>/ir` for infrared), in the `<frame>_depth_optical_frame` / `<frame>_color_optical_frame` frames (a single one if both cameras coincide) |
 | `CObservationPointCloud` | `<ns>/points` (`sensor_msgs/PointCloud2`) |
 | `CObservationOdometry` | `<ns>/odom` (`nav_msgs/Odometry`) + `/tf` (`odom` -> `base_link`) |
 | `CObservationRobotPose` | `<ns>/pose` (`geometry_msgs/PoseWithCovarianceStamped`) |
 | `CObservationComment` | `/rawlog_comment` (`std_msgs/String`) |
-| Other 3D sensors (`CObservation3DRangeScan`, `CObservationRotatingScan`,...) | `<ns>/points`, in the `base_link` frame |
+| Other 3D sensors (`CObservationRotatingScan`, 3D range scans without a depth image,...) | `<ns>/points`, in the `base_link` frame |
 
 In SensoryFrame-based rawlogs, the odometry actions are integrated into `/odom` + `/tf`.
 Externally stored JPEG/PNG images are copied into the bag byte by byte, without re-encoding them.
+RGB-D bags can be read back with `RgbdAssembler` (`rosbag2rawlog`, MOLA): depth is stored in
+millimeters, and intensity images as any other image (in-memory ones are lossy JPEG unless
+`--image-mode raw`); other layers (e.g. confidence) are not written. `camera_info` follows the actual
+image size if the rawlog declares another one.
 
 Main options (see `rawlog2rosbag --help`):
 

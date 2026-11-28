@@ -501,6 +501,9 @@ RgbdAssembler::Obs RgbdAssembler::pairWith(
   for (auto it = other.begin(); it != other.end(); ++it)
   {
     const double dt = std::abs(it->stamp - t);
+    // Remembered to report, if either is dropped, how close its counterpart came:
+    it->closestDt = std::min(it->closestDt, dt);
+    f.closestDt = std::min(f.closestDt, dt);
     if (dt <= bestDt)
     {
       best = it;
@@ -515,12 +518,7 @@ RgbdAssembler::Obs RgbdAssembler::pairWith(
     {
       // Report how close its best counterpart was, to tell a too strict
       // maxTimeOffset from a stream that is not arriving at all:
-      double closest = std::numeric_limits<double>::infinity();
-      for (const auto& o : other)
-      {
-        closest = std::min(closest, std::abs(o.stamp - own.front().stamp));
-      }
-      lastEvictedClosestDt_ = closest;
+      lastEvictedClosestDt_ = own.front().closestDt;
       droppedUnpaired_++;
       own.pop_front();
     }
@@ -544,6 +542,7 @@ void RgbdAssembler::dropOlderThan(std::deque<Frame>& queue, double minStamp)
   {
     if (it->stamp < minStamp)
     {
+      lastEvictedClosestDt_ = it->closestDt;
       it = queue.erase(it);
       droppedUnpaired_++;
     }
@@ -556,6 +555,19 @@ void RgbdAssembler::dropOlderThan(std::deque<Frame>& queue, double minStamp)
 
 void RgbdAssembler::dropPending()
 {
+  // Reported as the last evicted frame: the most recent one of both queues.
+  const Frame* newest = nullptr;
+  for (const auto* queue : {&depthQueue_, &intensityQueue_})
+  {
+    if (!queue->empty() && (!newest || queue->back().stamp > newest->stamp))
+    {
+      newest = &queue->back();
+    }
+  }
+  if (newest)
+  {
+    lastEvictedClosestDt_ = newest->closestDt;
+  }
   droppedUnpaired_ += depthQueue_.size() + intensityQueue_.size();
   depthQueue_.clear();
   intensityQueue_.clear();

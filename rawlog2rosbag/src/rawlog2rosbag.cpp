@@ -21,6 +21,7 @@
 #include <mrpt/obs/CActionRobotMovement2D.h>
 #include <mrpt/obs/CActionRobotMovement3D.h>
 #include <mrpt/obs/CObservation2DRangeScan.h>
+#include <mrpt/obs/CObservation3DRangeScan.h>
 #include <mrpt/obs/CObservationComment.h>
 #include <mrpt/obs/CObservationGPS.h>
 #include <mrpt/obs/CObservationIMU.h>
@@ -40,6 +41,7 @@
 #include <mrpt/ros2bridge/odometry.h>
 #include <mrpt/ros2bridge/point_cloud2.h>
 #include <mrpt/ros2bridge/pose.h>
+#include <mrpt/ros2bridge/rgbd.h>
 #include <mrpt/ros2bridge/time.h>
 #include <mrpt/serialization/CArchive.h>
 #include <mrpt/system/filesystem.h>
@@ -58,6 +60,7 @@
 #include <rosbag2_cpp/writer.hpp>
 #include <rosbag2_storage/storage_options.hpp>
 #include <rosbag2_storage/topic_metadata.hpp>
+#include <sensor_msgs/image_encodings.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <sensor_msgs/msg/compressed_image.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -72,9 +75,12 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -160,6 +166,79 @@ constexpr const char* SUFFIX_POINTS = "points";
 constexpr const char* SUFFIX_ODOM = "odom";
 constexpr const char* SUFFIX_POSE = "pose";
 constexpr const char* TOPIC_COMMENT = "/rawlog_comment";
+
+// RGB-D cameras: depth and intensity image topics and optical frames, as most ROS 2 drivers.
+constexpr const char* SUFFIX_DEPTH = "depth";
+constexpr const char* SUFFIX_OPTICAL_FRAME = "_optical_frame";
+
+// Whether a 3D range scan is written as RGB-D images (otherwise, as a point cloud).
+bool isRgbdScan(const mrpt::obs::CObservation3DRangeScan& o)
+{
+  return o.hasRangeImage && o.range_is_depth;
+}
+
+// Name of the intensity stream of an RGB-D camera, by its channel ("color" or "ir").
+std::string rgbdIntensityName(const mrpt::obs::CObservation3DRangeScan& o)
+{
+  return o.intensityImageChannel == mrpt::obs::CObservation3DRangeScan::CH_IR ? "ir" : "color";
+}
+
+// Optical frames (+Z forward) of the depth and intensity cameras: the same one if they coincide,
+// so readers of the bag find depth already registered to the intensity image.
+std::string rgbdDepthFrame(const std::string& frame)
+{
+  return frame + "_depth" + SUFFIX_OPTICAL_FRAME;
+}
+
+std::string rgbdIntensityFrame(
+    const mrpt::obs::CObservation3DRangeScan& o, const std::string& frame)
+{
+  return o.doDepthAndIntensityCamerasCoincide()
+             ? rgbdDepthFrame(frame)
+             : frame + "_" + rgbdIntensityName(o) + SUFFIX_OPTICAL_FRAME;
+}
+
+// Depth image of a 3D range scan as a 16UC1 image in millimeters (REP 118; 0: no measurement).
+sensor_msgs::msg::Image depthImageToROS(
+    const mrpt::obs::CObservation3DRangeScan& o, const std_msgs::msg::Header& h)
+{
+  sensor_msgs::msg::Image img;
+  img.header = h;
+  img.height = static_cast<uint32_t>(o.rangeImage.rows());
+  img.width = static_cast<uint32_t>(o.rangeImage.cols());
+  img.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
+  const uint16_t one = 1;
+  uint8_t firstByte = 0;
+  std::memcpy(&firstByte, &one, 1);
+  img.is_bigendian = firstByte == 0 ? 1 : 0;
+  img.step = img.width * sizeof(uint16_t);
+  img.data.resize(static_cast<size_t>(img.step) * img.height);
+
+  const double toMillimeters = 1e3 * static_cast<double>(o.rangeUnits);
+  const bool alreadyMillimeters = std::abs(toMillimeters - 1.0) < 1e-6;
+  for (uint32_t r = 0; r < img.height; r++)
+  {
+    auto* dst = reinterpret_cast<uint16_t*>(img.data.data() + static_cast<size_t>(r) * img.step);
+    for (uint32_t c = 0; c < img.width; c++)
+    {
+      const uint16_t v = o.rangeImage(static_cast<int>(r), static_cast<int>(c));
+      if (alreadyMillimeters)
+      {
+        dst[c] = v;
+        continue;
+      }
+      const double mm = std::round(static_cast<double>(v) * toMillimeters);
+      // Out of the 16-bit range: no measurement, rather than a wrong one.
+      if (mm > std::numeric_limits<uint16_t>::max())
+      {
+        dst[c] = 0;
+        continue;
+      }
+      dst[c] = static_cast<uint16_t>(mm);
+    }
+  }
+  return img;
+}
 
 bool posesDiffer(const mrpt::poses::CPose3D& a, const mrpt::poses::CPose3D& b)
 {
@@ -251,6 +330,7 @@ class Converter
   std::set<std::string> createdTopics_;
   std::map<std::string, size_t> writtenPerTopic_;
   std::map<std::string, size_t> unsupported_;  //!< class name -> count
+  std::set<std::string> sizeWarnings_;
 
   // Odometry integrated from the actions of SensoryFrame-based rawlogs:
   mrpt::poses::CPose3D actionOdometry_;
@@ -403,11 +483,39 @@ class Converter
     {
       st.poseChanges++;
     }
+
+    // The intensity camera of an RGB-D sensor may be missing from its first observations:
+    if (const auto* s3d = dynamic_cast<const mrpt::obs::CObservation3DRangeScan*>(&o);
+        s3d && isRgbdScan(*s3d) && s3d->hasIntensityImage &&
+        !s3d->doDepthAndIntensityCamerasCoincide())
+    {
+      const auto out = outputFor(o.sensorLabel);
+      if (!out.skip)
+      {
+        const auto intensityPose = *st.firstPose + s3d->relativePoseIntensityWRTDepth;
+        const auto [it, inserted] =
+            staticFrames_.emplace(rgbdIntensityFrame(*s3d, out.frame_id), intensityPose);
+        if (!inserted && posesDiffer(it->second, intensityPose))
+        {
+          st.poseChanges++;
+        }
+      }
+    }
   }
 
   void registerSensorFrames(
       const mrpt::obs::CObservation& o, const std::string& frame, const mrpt::poses::CPose3D& pose)
   {
+    if (const auto* s3d = dynamic_cast<const mrpt::obs::CObservation3DRangeScan*>(&o);
+        s3d && isRgbdScan(*s3d))
+    {
+      // sensorPose is the depth camera with +X forward; relativePoseIntensityWRTDepth is
+      // the intensity optical frame relative to it.
+      // (the intensity optical frame is registered by scanObservation())
+      staticFrames_[rgbdDepthFrame(frame)] =
+          pose + mrpt::ros2bridge::RgbdAssembler::opticalFrameInSensorFrame();
+      return;
+    }
     if (const auto* st = dynamic_cast<const mrpt::obs::CObservationStereoImages*>(&o); st)
     {
       staticFrames_[frame + "_left"] = pose;
@@ -553,6 +661,10 @@ class Converter
       const std_msgs::msg::Header& h,
       double projTx = 0)
   {
+    // camera_info first, so readers have the intrinsics of the first image:
+    auto ci = mrpt::ros2bridge::toROS(cam, h);
+    ci.p[3] = projTx;
+    write(ci, ns + "/camera_info", h.stamp);
     if (cli_.image_mode == "compressed")
     {
       write(
@@ -563,9 +675,6 @@ class Converter
     {
       write(mrpt::ros2bridge::toROS(img, h), ns + "/image_raw", h.stamp);
     }
-    auto ci = mrpt::ros2bridge::toROS(cam, h);
-    ci.p[3] = projTx;
-    write(ci, ns + "/camera_info", h.stamp);
     img.unload();  // free memory of externally-stored images
   }
 
@@ -646,6 +755,11 @@ class Converter
             headerOf(o, out.frame_id + "_right"), -st->rightCamera.fx() * st->rightCameraPose.x());
       }
     }
+    else if (const auto* s3d = dynamic_cast<const CObservation3DRangeScan*>(&o);
+             s3d && isRgbdScan(*s3d))
+    {
+      writeRgbd(*s3d, out);
+    }
     else if (const auto* pc = dynamic_cast<const CObservationPointCloud*>(&o); pc)
     {
       writePointCloud(pc->pointcloud, out.ns, h);
@@ -686,6 +800,56 @@ class Converter
         unsupported_[o.GetRuntimeClass()->className]++;
       }
     }
+  }
+
+  // RGB-D camera: <ns>/depth/image_raw (16UC1, millimeters) and <ns>/depth/camera_info, plus the
+  // intensity image as any other image, under <ns>/color (or <ns>/ir).
+  void writeRgbd(const mrpt::obs::CObservation3DRangeScan& o, const SensorOutput& out)
+  {
+    const auto hDepth = headerOf(o, rgbdDepthFrame(out.frame_id));
+    const std::string depthNs = out.ns + "/" + SUFFIX_DEPTH;
+    const auto depthCam = withImageSize(
+        o.cameraParams, static_cast<uint32_t>(o.rangeImage.cols()),
+        static_cast<uint32_t>(o.rangeImage.rows()), o.sensorLabel + " (depth)");
+    write(mrpt::ros2bridge::toROS(depthCam, hDepth), depthNs + "/camera_info", hDepth.stamp);
+    write(depthImageToROS(o, hDepth), depthNs + "/image_raw", hDepth.stamp);
+
+    if (o.hasIntensityImage)
+    {
+      const auto intensityCam = withImageSize(
+          o.cameraParamsIntensity, static_cast<uint32_t>(o.intensityImage.getWidth()),
+          static_cast<uint32_t>(o.intensityImage.getHeight()), o.sensorLabel + " (intensity)");
+      writeImage(
+          o.intensityImage, intensityCam, out.ns + "/" + rgbdIntensityName(o),
+          headerOf(o, rgbdIntensityFrame(o, out.frame_id)));
+    }
+  }
+
+  // Camera parameters with the size of their actual image, which some datasets declare wrong:
+  // camera_info and image must agree for the readers of the bag. A swapped size keeps the
+  // intrinsics; another resolution with the same aspect ratio scales them.
+  mrpt::img::TCamera withImageSize(
+      mrpt::img::TCamera cam, uint32_t width, uint32_t height, const std::string& what)
+  {
+    if (cam.ncols == width && cam.nrows == height)
+    {
+      return cam;
+    }
+    const bool swapped = cam.ncols == height && cam.nrows == width;
+    if (sizeWarnings_.insert(what).second)
+    {
+      std::cerr << "  Warning: '" << what << "' declares a " << cam.ncols << "x" << cam.nrows
+                << " camera for " << width << "x" << height << " images. Writing camera_info "
+                << (swapped ? "with the image size" : "scaled to the image size") << ".\n";
+    }
+    if (swapped)
+    {
+      cam.ncols = width;
+      cam.nrows = height;
+      return cam;
+    }
+    cam.scaleToResolution(width, height);  // throws if the aspect ratio differs
+    return cam;
   }
 
   void writePointCloud(

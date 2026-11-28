@@ -12,6 +12,7 @@
 #include <mrpt/ros2bridge/image.h>
 #include <mrpt/system/filesystem.h>
 
+#include <cstring>
 #include <sensor_msgs/image_encodings.hpp>
 #include <std_msgs/msg/header.hpp>
 
@@ -106,6 +107,40 @@ TEST(Image, rgba8DropsAlpha)
 
 // A Bayer mosaic of a uniform color must demosaic to exactly that color on
 // every pixel, borders included, for all four tile layouts:
+TEST(Image, toROSDropsAlphaOfRgbaImages)
+{
+  mrpt::img::CImage img(2, 1, mrpt::img::CH_RGBA);
+  const uint8_t px[8] = {10, 20, 30, 255, 40, 50, 60, 128};
+  std::memcpy(img.ptrLine<uint8_t>(0), px, sizeof(px));
+
+  const auto out = mrpt::ros2bridge::toROS(img, std_msgs::msg::Header());
+  EXPECT_EQ(out.encoding, sensor_msgs::image_encodings::RGB8);
+  EXPECT_EQ(out.step, 6U);
+  const std::vector<uint8_t> expected = {10, 20, 30, 40, 50, 60};
+  EXPECT_EQ(out.data, expected);
+}
+
+TEST(Image, toROSKeeps16BitImages)
+{
+  mrpt::img::CImage img;
+  img.resize(3, 1, mrpt::img::CH_GRAY, mrpt::img::PixelDepth::D16U);
+  const uint16_t px[3] = {0x1234, 0x5678, 0x9abc};
+  std::memcpy(img.ptrLine<uint8_t>(0), px, sizeof(px));
+
+  const auto out = mrpt::ros2bridge::toROS(img, std_msgs::msg::Header());
+  EXPECT_EQ(out.encoding, sensor_msgs::image_encodings::MONO16);
+  EXPECT_EQ(out.step, 6U);
+  ASSERT_EQ(out.data.size(), 6U);
+  uint16_t back[3] = {0, 0, 0};
+  std::memcpy(back, out.data.data(), sizeof(back));
+  EXPECT_EQ(back[0], 0x1234);
+  EXPECT_EQ(back[2], 0x9abc);
+
+  // Back to MRPT, narrowed to 8 bits:
+  const auto img8 = mrpt::ros2bridge::fromROS(out);
+  EXPECT_EQ(img8.at<uint8_t>(1, 0, 0), 0x56);
+}
+
 TEST(Image, bayer8UniformColor)
 {
   const uint8_t R = 200;
