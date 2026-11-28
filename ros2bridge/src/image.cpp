@@ -157,20 +157,49 @@ sensor_msgs::msg::Image mrpt::ros2bridge::toROS(
   const int32_t w = img.getWidth();
   const int32_t h = img.getHeight();
   const bool isColor = img.isColor();
-  const int32_t nCh = isColor ? 3 : 1;
+  const bool is16bit = img.getPixelDepth() == mrpt::img::PixelDepth::D16U;
+  // Alpha, if any, is dropped:
+  const size_t srcChannels = static_cast<size_t>(img.channels());
+  const size_t dstChannels = isColor ? 3 : 1;
+  const size_t bytesPerSample = is16bit ? 2 : 1;
+  ASSERT_(srcChannels == dstChannels || (isColor && srcChannels == 4));
 
   msg.height = static_cast<uint32_t>(h);
   msg.width = static_cast<uint32_t>(w);
   // CImage keeps color channels in RGB order, so no channel swap is needed here:
-  msg.encoding = isColor ? sensor_msgs::image_encodings::RGB8 : sensor_msgs::image_encodings::MONO8;
-  msg.is_bigendian = 0;
-  msg.step = static_cast<uint32_t>(w * nCh);
+  if (is16bit)
+  {
+    msg.encoding =
+        isColor ? sensor_msgs::image_encodings::RGB16 : sensor_msgs::image_encodings::MONO16;
+  }
+  else
+  {
+    msg.encoding =
+        isColor ? sensor_msgs::image_encodings::RGB8 : sensor_msgs::image_encodings::MONO8;
+  }
+  // 16-bit pixels are stored in the host byte order:
+  const uint16_t one = 1;
+  uint8_t firstByte = 0;
+  std::memcpy(&firstByte, &one, 1);
+  msg.is_bigendian = (is16bit && firstByte == 0) ? 1 : 0;
+  const size_t dstPixelBytes = dstChannels * bytesPerSample;
+  const size_t srcPixelBytes = srcChannels * bytesPerSample;
+  msg.step = static_cast<uint32_t>(static_cast<size_t>(w) * dstPixelBytes);
   msg.data.resize(static_cast<size_t>(h) * msg.step);
 
   for (int32_t row = 0; row < h; row++)
   {
-    std::memcpy(
-        msg.data.data() + static_cast<size_t>(row) * msg.step, img.ptrLine<uint8_t>(row), msg.step);
+    const auto* src = img.ptrLine<uint8_t>(row);
+    uint8_t* dst = msg.data.data() + static_cast<size_t>(row) * msg.step;
+    if (srcChannels == dstChannels)
+    {
+      std::memcpy(dst, src, msg.step);
+      continue;
+    }
+    for (int32_t col = 0; col < w; col++, src += srcPixelBytes, dst += dstPixelBytes)
+    {
+      std::memcpy(dst, src, dstPixelBytes);
+    }
   }
 
   return msg;

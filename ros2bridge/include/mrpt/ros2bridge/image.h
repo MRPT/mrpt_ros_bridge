@@ -38,7 +38,8 @@ mrpt::img::CImage fromROS(const sensor_msgs::msg::Image& i);
  *  ...), or nullopt for any other encoding. */
 std::optional<mrpt::img::BayerPattern> bayerPatternFromROS(const std::string& encoding);
 
-/** Makes a deep copy of the image data */
+/** Makes a deep copy of the image data: rgb8 or mono8 (rgb16 or mono16 for 16-bit images).
+ *  The alpha channel, if any, is dropped. */
 sensor_msgs::msg::Image toROS(const mrpt::img::CImage& i, const std_msgs::msg::Header& msg_header);
 
 /** MRPT->ROS: an image as sensor_msgs/CompressedImage.
@@ -49,7 +50,8 @@ sensor_msgs::msg::CompressedImage toROS_Compressed(
     const mrpt::img::CImage& i, const std_msgs::msg::Header& msg_header, int jpeg_quality = 95);
 
 /** ROS->MRPT: decodes a sensor_msgs/CompressedImage (JPEG or PNG).
- *  eturn An empty image on decoding errors.
+ *
+eturn An empty image on decoding errors.
  */
 mrpt::img::CImage fromROS(const sensor_msgs::msg::CompressedImage& i);
 /** @} */

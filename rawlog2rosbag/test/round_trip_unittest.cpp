@@ -380,7 +380,8 @@ TEST(rawlog2rosbag, SensoryFrameRawlog)
 }
 
 // RGB-D cameras: depth + intensity images, camera_info and optical frames that RgbdAssembler
-// turns back into the original observations.
+// turns back into the original observations. The first observation has no intensity image, so its
+// optical frame must come from a later one.
 TEST(rawlog2rosbag, RgbdRoundTrip)
 {
   const char* exe = std::getenv("RAWLOG2ROSBAG_EXE");
@@ -391,7 +392,7 @@ TEST(rawlog2rosbag, RgbdRoundTrip)
   const std::string rawlog = dir + "/rgbd.rawlog";
   constexpr size_t NUM_FRAMES = 3;
 
-  // Depth 8x6 in units of 0.2 mm (as TUM RGB-D), and a larger color image from a camera
+  // Depth 8x6 in units of 0.2 mm, and a larger color image from a camera
   // 2.5 cm to its side:
   auto ref = mrpt::obs::CObservation3DRangeScan::Create();
   ref->sensorLabel = "RGBD";
@@ -424,8 +425,10 @@ TEST(rawlog2rosbag, RgbdRoundTrip)
     for (size_t i = 0; i < NUM_FRAMES; i++)
     {
       ref->timestamp = mrpt::Clock::fromDouble(T0 + 0.1 * static_cast<double>(i));
+      ref->hasIntensityImage = i > 0;
       arch << *ref;
     }
+    ref->hasIntensityImage = true;
   }
 
   const std::string bag = dir + "/bag";
@@ -486,14 +489,15 @@ TEST(rawlog2rosbag, RgbdRoundTrip)
   mrpt::system::deleteFilesInDirectory(dir, true);
 
   EXPECT_EQ(counts["/rgbd/depth/image_raw"], NUM_FRAMES);
-  EXPECT_EQ(counts["/rgbd/color/image_raw"], NUM_FRAMES);
+  EXPECT_EQ(counts["/rgbd/color/image_raw"], NUM_FRAMES - 1);
   EXPECT_EQ(counts["/rgbd/points"], 0u);
-  ASSERT_EQ(out.size(), NUM_FRAMES);
+  // The first depth image has no counterpart:
+  ASSERT_EQ(out.size(), NUM_FRAMES - 1);
   EXPECT_EQ(assembler.droppedWithoutTf(), 0u);
-  for (size_t i = 0; i < NUM_FRAMES; i++)
+  for (size_t i = 0; i < out.size(); i++)
   {
     const auto& o = *out[i];
-    EXPECT_NEAR(mrpt::Clock::toDouble(o.timestamp), T0 + 0.1 * static_cast<double>(i), 1e-6);
+    EXPECT_NEAR(mrpt::Clock::toDouble(o.timestamp), T0 + 0.1 * static_cast<double>(i + 1), 1e-6);
     EXPECT_NEAR((o.sensorPose.asVectorVal() - ref->sensorPose.asVectorVal()).norm(), 0, 1e-6);
     EXPECT_NEAR(
         (o.relativePoseIntensityWRTDepth.asVectorVal() -

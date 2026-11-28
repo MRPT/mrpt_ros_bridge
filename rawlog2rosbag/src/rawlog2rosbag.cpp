@@ -228,7 +228,13 @@ sensor_msgs::msg::Image depthImageToROS(
         continue;
       }
       const double mm = std::round(static_cast<double>(v) * toMillimeters);
-      dst[c] = static_cast<uint16_t>(std::min<double>(mm, std::numeric_limits<uint16_t>::max()));
+      // Out of the 16-bit range: no measurement, rather than a wrong one.
+      if (mm > std::numeric_limits<uint16_t>::max())
+      {
+        dst[c] = 0;
+        continue;
+      }
+      dst[c] = static_cast<uint16_t>(mm);
     }
   }
   return img;
@@ -477,6 +483,24 @@ class Converter
     {
       st.poseChanges++;
     }
+
+    // The intensity camera of an RGB-D sensor may be missing from its first observations:
+    if (const auto* s3d = dynamic_cast<const mrpt::obs::CObservation3DRangeScan*>(&o);
+        s3d && isRgbdScan(*s3d) && s3d->hasIntensityImage &&
+        !s3d->doDepthAndIntensityCamerasCoincide())
+    {
+      const auto out = outputFor(o.sensorLabel);
+      if (!out.skip)
+      {
+        const auto intensityPose = *st.firstPose + s3d->relativePoseIntensityWRTDepth;
+        const auto [it, inserted] =
+            staticFrames_.emplace(rgbdIntensityFrame(*s3d, out.frame_id), intensityPose);
+        if (!inserted && posesDiffer(it->second, intensityPose))
+        {
+          st.poseChanges++;
+        }
+      }
+    }
   }
 
   void registerSensorFrames(
@@ -487,12 +511,9 @@ class Converter
     {
       // sensorPose is the depth camera with +X forward; relativePoseIntensityWRTDepth is
       // the intensity optical frame relative to it.
+      // (the intensity optical frame is registered by scanObservation())
       staticFrames_[rgbdDepthFrame(frame)] =
           pose + mrpt::ros2bridge::RgbdAssembler::opticalFrameInSensorFrame();
-      if (s3d->hasIntensityImage && !s3d->doDepthAndIntensityCamerasCoincide())
-      {
-        staticFrames_[rgbdIntensityFrame(*s3d, frame)] = pose + s3d->relativePoseIntensityWRTDepth;
-      }
       return;
     }
     if (const auto* st = dynamic_cast<const mrpt::obs::CObservationStereoImages*>(&o); st)
@@ -804,22 +825,30 @@ class Converter
     }
   }
 
-  // Camera parameters with the size of their actual image, which some datasets declare wrong
-  // (e.g. swapped): camera_info and image must agree for the readers of the bag.
+  // Camera parameters with the size of their actual image, which some datasets declare wrong:
+  // camera_info and image must agree for the readers of the bag. A swapped size keeps the
+  // intrinsics; another resolution with the same aspect ratio scales them.
   mrpt::img::TCamera withImageSize(
       mrpt::img::TCamera cam, uint32_t width, uint32_t height, const std::string& what)
   {
-    if (cam.ncols != width || cam.nrows != height)
+    if (cam.ncols == width && cam.nrows == height)
     {
-      if (sizeWarnings_.insert(what).second)
-      {
-        std::cerr << "  Warning: '" << what << "' declares a " << cam.ncols << "x" << cam.nrows
-                  << " camera for " << width << "x" << height
-                  << " images. Writing camera_info with the image size.\n";
-      }
+      return cam;
+    }
+    const bool swapped = cam.ncols == height && cam.nrows == width;
+    if (sizeWarnings_.insert(what).second)
+    {
+      std::cerr << "  Warning: '" << what << "' declares a " << cam.ncols << "x" << cam.nrows
+                << " camera for " << width << "x" << height << " images. Writing camera_info "
+                << (swapped ? "with the image size" : "scaled to the image size") << ".\n";
+    }
+    if (swapped)
+    {
       cam.ncols = width;
       cam.nrows = height;
+      return cam;
     }
+    cam.scaleToResolution(width, height);  // throws if the aspect ratio differs
     return cam;
   }
 

@@ -142,8 +142,10 @@ written to `/lms_sick_left/scan` in frame `lms_sick_left`):
 
 In SensoryFrame-based rawlogs, the odometry actions are integrated into `/odom` + `/tf`.
 Externally stored JPEG/PNG images are copied into the bag byte by byte, without re-encoding them.
-RGB-D bags read back by `RgbdAssembler` (`rosbag2rawlog`, MOLA) reproduce the original observations;
-`camera_info` takes the actual image size if the rawlog declares another one.
+RGB-D bags can be read back with `RgbdAssembler` (`rosbag2rawlog`, MOLA): depth is stored in
+millimeters, and intensity images as any other image (in-memory ones are lossy JPEG unless
+`--image-mode raw`); other layers (e.g. confidence) are not written. `camera_info` follows the actual
+image size if the rawlog declares another one.
 
 Main options (see `rawlog2rosbag --help`):
 
