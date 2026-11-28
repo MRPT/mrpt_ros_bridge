@@ -501,6 +501,9 @@ RgbdAssembler::Obs RgbdAssembler::pairWith(
   for (auto it = other.begin(); it != other.end(); ++it)
   {
     const double dt = std::abs(it->stamp - t);
+    // Remembered to report, if either is dropped, how close its counterpart came:
+    it->closestDt = std::min(it->closestDt, dt);
+    f.closestDt = std::min(f.closestDt, dt);
     if (dt <= bestDt)
     {
       best = it;
@@ -515,12 +518,7 @@ RgbdAssembler::Obs RgbdAssembler::pairWith(
     {
       // Report how close its best counterpart was, to tell a too strict
       // maxTimeOffset from a stream that is not arriving at all:
-      double closest = std::numeric_limits<double>::infinity();
-      for (const auto& o : other)
-      {
-        closest = std::min(closest, std::abs(o.stamp - own.front().stamp));
-      }
-      lastEvictedClosestDt_ = closest;
+      lastEvictedClosestDt_ = own.front().closestDt;
       droppedUnpaired_++;
       own.pop_front();
     }
@@ -544,6 +542,7 @@ void RgbdAssembler::dropOlderThan(std::deque<Frame>& queue, double minStamp)
   {
     if (it->stamp < minStamp)
     {
+      lastEvictedClosestDt_ = it->closestDt;
       it = queue.erase(it);
       droppedUnpaired_++;
     }

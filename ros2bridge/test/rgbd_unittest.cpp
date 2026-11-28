@@ -681,6 +681,8 @@ TEST(RGBD, AssemblerKeepsFramesThatCanStillPair)
   EXPECT_TRUE(a.onDepthImage(depth16(mm, 3, 2, 20.030, "cam")).empty());
   EXPECT_EQ(a.onIntensityImage(rgb8(3, 2, 20.030, "cam")).size(), 1U);
   EXPECT_EQ(a.droppedUnpaired(), 1U);
+  // ... reporting how close its counterpart came (the intensity image 30 ms later):
+  EXPECT_NEAR(a.lastEvictedClosestDt(), 0.030, 1e-6);
 
   // At the end of a stream, frames still waiting are dropped and counted too:
   EXPECT_TRUE(a.onDepthImage(depth16(mm, 3, 2, 30.000, "cam")).empty());

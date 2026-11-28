@@ -22,6 +22,7 @@
 #include <mrpt/poses/CPose3D.h>
 
 #include <deque>
+#include <limits>
 #include <map>
 #include <memory>
 #include <optional>
@@ -161,7 +162,8 @@ class RgbdAssembler
   [[nodiscard]] size_t droppedWithoutTf() const { return droppedNoTf_; }
   /** Error message of the last missing /tf transform. */
   [[nodiscard]] const std::string& lastTfError() const { return lastTfError_; }
-  /** Smallest stamp difference seen for the last evicted image [s]. */
+  /** Smallest stamp difference to the other stream seen for the last image dropped
+   *  without a counterpart [s] (infinity if none arrived while it waited). */
   [[nodiscard]] double lastEvictedClosestDt() const { return lastEvictedClosestDt_; }
 
   /** Pose of a camera optical frame (+Z forward, ROS REP 103) in the MRPT 3D range
@@ -176,6 +178,8 @@ class RgbdAssembler
     std_msgs::msg::Header header;
     mrpt::math::CMatrix_u16 depth;
     mrpt::img::CImage intensity;
+    /** Smallest stamp difference to any image of the other stream seen so far [s] */
+    double closestDt = std::numeric_limits<double>::infinity();
   };
 
   Parameters params_;
