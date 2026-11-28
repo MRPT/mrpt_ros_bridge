@@ -116,26 +116,31 @@ mrpt::img::CImage mrpt::ros2bridge::fromROS(const sensor_msgs::msg::Image& msg)
 
   mrpt::img::CImage img(w, h, isColor ? CH_RGB : CH_GRAY);
 
+  // Row pointers, not per-pixel accessors: this runs on every camera frame.
+  const size_t dstRowBytes = static_cast<size_t>(w) * (isColor ? 3 : 1);
+  const bool sameLayout = !is16bit && !swapRedBlue && srcBytesPerPixel == (isColor ? 3 : 1);
   for (int32_t row = 0; row < h; row++)
   {
-    const uint8_t* srcRow = msg.data.data() + static_cast<size_t>(row) * msg.step;
-    for (int32_t col = 0; col < w; col++)
+    const uint8_t* src = msg.data.data() + static_cast<size_t>(row) * msg.step;
+    auto* dst = img.ptrLine<uint8_t>(row);
+    if (sameLayout)
     {
-      const uint8_t* px = srcRow + static_cast<size_t>(col) * srcBytesPerPixel;
+      std::memcpy(dst, src, dstRowBytes);
+      continue;
+    }
+    for (int32_t col = 0; col < w; col++, src += srcBytesPerPixel)
+    {
       if (isColor)
       {
-        img.at<uint8_t>(col, row, 0) = swapRedBlue ? px[2] : px[0];
-        img.at<uint8_t>(col, row, 1) = px[1];
-        img.at<uint8_t>(col, row, 2) = swapRedBlue ? px[0] : px[2];
-      }
-      else if (is16bit)
-      {
-        // Narrowed down to the 8 most significant bits:
-        img.at<uint8_t>(col, row, 0) = msg.is_bigendian ? px[0] : px[1];
+        dst[0] = swapRedBlue ? src[2] : src[0];
+        dst[1] = src[1];
+        dst[2] = swapRedBlue ? src[0] : src[2];
+        dst += 3;
       }
       else
       {
-        img.at<uint8_t>(col, row, 0) = px[0];
+        // 16 bit: narrowed down to the 8 most significant bits
+        *dst++ = is16bit ? (msg.is_bigendian ? src[0] : src[1]) : src[0];
       }
     }
   }
@@ -162,27 +167,10 @@ sensor_msgs::msg::Image mrpt::ros2bridge::toROS(
   msg.step = static_cast<uint32_t>(w * nCh);
   msg.data.resize(static_cast<size_t>(h) * msg.step);
 
-  uint8_t* dst = msg.data.data();
-
   for (int32_t row = 0; row < h; row++)
   {
-    uint8_t* dstRow = dst + row * msg.step;
-    if (isColor)
-    {
-      for (int32_t col = 0; col < w; col++)
-      {
-        dstRow[col * 3 + 0] = img.at<uint8_t>(col, row, 0);
-        dstRow[col * 3 + 1] = img.at<uint8_t>(col, row, 1);
-        dstRow[col * 3 + 2] = img.at<uint8_t>(col, row, 2);
-      }
-    }
-    else
-    {
-      for (int32_t col = 0; col < w; col++)
-      {
-        dstRow[col] = img.at<uint8_t>(col, row, 0);
-      }
-    }
+    std::memcpy(
+        msg.data.data() + static_cast<size_t>(row) * msg.step, img.ptrLine<uint8_t>(row), msg.step);
   }
 
   return msg;
