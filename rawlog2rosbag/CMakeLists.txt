@@ -57,6 +57,7 @@ if(BUILD_TESTING)
 
   # Round trip: synthetic rawlog -> rawlog2rosbag -> read the bag back -> compare.
   find_package(ament_cmake_gtest REQUIRED)
+  find_package(tf2 REQUIRED)
   ament_add_gtest(test_${PROJECT_NAME} test/round_trip_unittest.cpp
     ENV RAWLOG2ROSBAG_EXE=$<TARGET_FILE:${PROJECT_NAME}>
   )
@@ -70,6 +71,7 @@ if(BUILD_TESTING)
       sensor_msgs::sensor_msgs_library
       std_msgs::std_msgs__rosidl_typesupport_cpp
       tf2_msgs::tf2_msgs__rosidl_typesupport_cpp
+      tf2::tf2
     )
     target_compile_definitions(test_${PROJECT_NAME} PRIVATE ROSBAG2_PRE_IRON=${ROSBAG2_PRE_IRON})
   endif()

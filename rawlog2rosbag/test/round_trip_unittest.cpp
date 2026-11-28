@@ -15,6 +15,7 @@
 #include <mrpt/obs/CActionCollection.h>
 #include <mrpt/obs/CActionRobotMovement2D.h>
 #include <mrpt/obs/CObservation2DRangeScan.h>
+#include <mrpt/obs/CObservation3DRangeScan.h>
 #include <mrpt/obs/CObservationComment.h>
 #include <mrpt/obs/CObservationGPS.h>
 #include <mrpt/obs/CObservationIMU.h>
@@ -25,6 +26,7 @@
 #include <mrpt/obs/CSensoryFrame.h>
 #include <mrpt/ros2bridge/camera_info.h>
 #include <mrpt/ros2bridge/laser_scan.h>
+#include <mrpt/ros2bridge/rgbd.h>
 #include <mrpt/ros2bridge/time.h>
 #include <mrpt/serialization/CArchive.h>
 #include <mrpt/system/filesystem.h>
@@ -43,6 +45,7 @@
 #include <sensor_msgs/msg/nav_sat_fix.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <tf2/buffer_core.hpp>
 #include <tf2_msgs/msg/tf_message.hpp>
 
 namespace
@@ -374,4 +377,140 @@ TEST(rawlog2rosbag, SensoryFrameRawlog)
   ASSERT_TRUE(lastOdom.has_value());
   EXPECT_NEAR(lastOdom->pose.pose.position.x, 0.0, 1e-6);
   EXPECT_NEAR(lastOdom->pose.pose.position.y, 0.0, 1e-6);
+}
+
+// RGB-D cameras: depth + intensity images, camera_info and optical frames that RgbdAssembler
+// turns back into the original observations.
+TEST(rawlog2rosbag, RgbdRoundTrip)
+{
+  const char* exe = std::getenv("RAWLOG2ROSBAG_EXE");
+  ASSERT_NE(exe, nullptr);
+
+  const std::string dir = mrpt::system::getTempFileName() + "_rawlog2rosbag_rgbd_test";
+  mrpt::system::createDirectory(dir);
+  const std::string rawlog = dir + "/rgbd.rawlog";
+  constexpr size_t NUM_FRAMES = 3;
+
+  // Depth 8x6 in units of 0.2 mm (as TUM RGB-D), and a larger color image from a camera
+  // 2.5 cm to its side:
+  auto ref = mrpt::obs::CObservation3DRangeScan::Create();
+  ref->sensorLabel = "RGBD";
+  ref->sensorPose = mrpt::poses::CPose3D(0.3, 0.0, 0.5, 0.1, 0.2, 0.0);
+  ref->hasRangeImage = true;
+  ref->range_is_depth = true;
+  ref->rangeUnits = 2e-4f;
+  ref->rangeImage.resize(6, 8);
+  for (int r = 0; r < 6; r++)
+  {
+    for (int c = 0; c < 8; c++)
+    {
+      ref->rangeImage(r, c) = static_cast<uint16_t>(r == 2 && c == 3 ? 0 : 5000 + 100 * r + c);
+    }
+  }
+  ref->cameraParams.ncols = 8;
+  ref->cameraParams.nrows = 6;
+  ref->cameraParams.setIntrinsicParamsFromValues(6, 6, 4, 3);
+  ref->hasIntensityImage = true;
+  ref->intensityImage = mrpt::img::CImage(16, 12, mrpt::img::CH_RGB);
+  ref->intensityImage.filledRectangle({0, 0}, {15, 11}, mrpt::img::TColor(10, 20, 30));
+  ref->cameraParamsIntensity.ncols = 16;
+  ref->cameraParamsIntensity.nrows = 12;
+  ref->cameraParamsIntensity.setIntrinsicParamsFromValues(12, 12, 8, 6);
+  ref->relativePoseIntensityWRTDepth = mrpt::poses::CPose3D(0, -0.025, 0, 0, 0, 0) +
+                                       mrpt::ros2bridge::RgbdAssembler::opticalFrameInSensorFrame();
+  {
+    mrpt::io::CFileGZOutputStream f(rawlog);
+    auto arch = mrpt::serialization::archiveFrom(f);
+    for (size_t i = 0; i < NUM_FRAMES; i++)
+    {
+      ref->timestamp = mrpt::Clock::fromDouble(T0 + 0.1 * static_cast<double>(i));
+      arch << *ref;
+    }
+  }
+
+  const std::string bag = dir + "/bag";
+  const std::string cmd =
+      std::string(exe) + " -i " + rawlog + " -o " + bag + " -w --image-mode raw";
+  ASSERT_EQ(std::system(cmd.c_str()), 0) << cmd;
+
+  auto tf = std::make_shared<tf2::BufferCore>();
+  mrpt::ros2bridge::RgbdAssembler::Parameters p;
+  p.sensorLabel = "RGBD";
+  mrpt::ros2bridge::RgbdAssembler assembler(p, tf, "base_link");
+
+  rosbag2_cpp::Reader reader;
+  reader.open(bag);
+  std::map<std::string, size_t> counts;
+  std::vector<mrpt::obs::CObservation3DRangeScan::Ptr> out;
+  const auto collect = [&out](const mrpt::ros2bridge::RgbdAssembler::Obs& v)
+  {
+    for (const auto& o : v)
+    {
+      out.push_back(std::dynamic_pointer_cast<mrpt::obs::CObservation3DRangeScan>(o));
+    }
+  };
+  while (reader.has_next())
+  {
+    const auto m = reader.read_next();
+    counts[m->topic_name]++;
+    if (m->topic_name == "/tf_static")
+    {
+      for (const auto& t : deserialize<tf2_msgs::msg::TFMessage>(*m).transforms)
+      {
+        tf->setTransform(t, "bag", true);
+      }
+    }
+    else if (m->topic_name == "/rgbd/depth/camera_info")
+    {
+      assembler.onDepthCameraInfo(deserialize<sensor_msgs::msg::CameraInfo>(*m));
+    }
+    else if (m->topic_name == "/rgbd/color/camera_info")
+    {
+      assembler.onIntensityCameraInfo(deserialize<sensor_msgs::msg::CameraInfo>(*m));
+    }
+    else if (m->topic_name == "/rgbd/depth/image_raw")
+    {
+      const auto img = deserialize<sensor_msgs::msg::Image>(*m);
+      EXPECT_EQ(img.encoding, "16UC1");
+      EXPECT_EQ(img.header.frame_id, "rgbd_depth_optical_frame");
+      collect(assembler.onDepthImage(img));
+    }
+    else if (m->topic_name == "/rgbd/color/image_raw")
+    {
+      const auto img = deserialize<sensor_msgs::msg::Image>(*m);
+      EXPECT_EQ(img.header.frame_id, "rgbd_color_optical_frame");
+      collect(assembler.onIntensityImage(img));
+    }
+  }
+  reader.close();
+  mrpt::system::deleteFilesInDirectory(dir, true);
+
+  EXPECT_EQ(counts["/rgbd/depth/image_raw"], NUM_FRAMES);
+  EXPECT_EQ(counts["/rgbd/color/image_raw"], NUM_FRAMES);
+  EXPECT_EQ(counts["/rgbd/points"], 0u);
+  ASSERT_EQ(out.size(), NUM_FRAMES);
+  EXPECT_EQ(assembler.droppedWithoutTf(), 0u);
+  for (size_t i = 0; i < NUM_FRAMES; i++)
+  {
+    const auto& o = *out[i];
+    EXPECT_NEAR(mrpt::Clock::toDouble(o.timestamp), T0 + 0.1 * static_cast<double>(i), 1e-6);
+    EXPECT_NEAR((o.sensorPose.asVectorVal() - ref->sensorPose.asVectorVal()).norm(), 0, 1e-6);
+    EXPECT_NEAR(
+        (o.relativePoseIntensityWRTDepth.asVectorVal() -
+         ref->relativePoseIntensityWRTDepth.asVectorVal())
+            .norm(),
+        0, 1e-6);
+    EXPECT_FALSE(o.doDepthAndIntensityCamerasCoincide());
+    EXPECT_DOUBLE_EQ(o.cameraParams.fx(), 6.0);
+    EXPECT_DOUBLE_EQ(o.cameraParamsIntensity.fx(), 12.0);
+    ASSERT_EQ(o.rangeImage.rows(), 6);
+    ASSERT_EQ(o.rangeImage.cols(), 8);
+    // Same depth, in millimeters:
+    EXPECT_NEAR(o.rangeUnits, 1e-3f, 1e-9f);
+    EXPECT_EQ(o.rangeImage(2, 3), 0);
+    EXPECT_EQ(o.rangeImage(1, 4), 1021);  // round((5000 + 100 + 4) * 0.2)
+    EXPECT_EQ(o.intensityImage.getWidth(), 16);
+    EXPECT_EQ(o.intensityImage.getHeight(), 12);
+    EXPECT_EQ(o.intensityImage.ptrLine<uint8_t>(4)[3 * 3 + 1], 20);  // green, as RGB or BGR
+  }
 }
